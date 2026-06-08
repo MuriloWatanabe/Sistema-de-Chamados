@@ -44,7 +44,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     @Column(name = "ACTIVE", nullable = false)
-    private Boolean active;
+    private Boolean active = true;
 
     @Column(name = "ROLE", nullable = false)
     private Integer role;

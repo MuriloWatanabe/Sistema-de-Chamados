@@ -23,6 +23,7 @@ Isso vai subir:
 - `backend/Dockerfile` compila o projeto com Maven dentro do container.
 - `backend/docker-compose.yml` sobe o PostgreSQL e o backend na mesma rede.
 - O backend usa as variaveis de ambiente passadas pelo `compose`.
+- As tabelas sao criadas/atualizadas automaticamente pelo Hibernate na inicializacao.
 
 ## Banco de dados
 

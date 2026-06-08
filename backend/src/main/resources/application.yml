@@ -13,6 +13,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        globally_quoted_identifiers: true
         jdbc:
           time_zone: America/Sao_Paulo
 
