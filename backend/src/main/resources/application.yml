@@ -1,8 +1,8 @@
 spring:
   application:
-    name: sistema-de-chamados
+    name: helpdesk
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sistema_chamados}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/helpdesk}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver

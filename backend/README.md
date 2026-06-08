@@ -28,7 +28,7 @@ Isso vai subir:
 ## Banco de dados
 
 Configuracao usada no ambiente Docker:
-- banco: `sistema_chamados`
+- banco: `helpdesk`
 - usuario: `postgres`
 - senha: `postgres`
 

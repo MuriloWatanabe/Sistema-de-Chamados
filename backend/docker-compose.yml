@@ -3,7 +3,7 @@ services:
     image: postgres:16
     container_name: helpdesk-postgres
     environment:
-      POSTGRES_DB: sistema_chamados
+      POSTGRES_DB: helpdesk
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sistema_chamados"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d helpdesk"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,7 +25,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sistema_chamados
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/helpdesk
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SERVER_PORT: 8080

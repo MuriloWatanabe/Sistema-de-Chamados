@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>br.com.sistemadechamados</groupId>
+    <groupId>br.com.helpdesk</groupId>
     <artifactId>sistema-de-chamados</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>sistema-de-chamados</name>
