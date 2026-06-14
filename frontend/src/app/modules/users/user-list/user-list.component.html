@@ -1,0 +1,107 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Usuários</h1>
+    <p class="page-subtitle">{{ users.length }} usuário(s) cadastrado(s)</p>
+  </div>
+  @if (auth.isAdmin()) {
+    <button class="btn btn-primary" (click)="openCreate()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      Novo Usuário
+    </button>
+  }
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Usuário</th>
+        <th>E-mail</th>
+        <th>Perfil</th>
+        <th>Status</th>
+        <th>Criado em</th>
+        @if (auth.isSupervisorOrAbove()) { <th></th> }
+      </tr>
+    </thead>
+    <tbody>
+      @for (u of users; track u.id) {
+        <tr>
+          <td>
+            <div class="user-cell">
+              <div class="avatar-sm">{{ getInitials(u.name) }}</div>
+              <span>{{ u.name }}</span>
+            </div>
+          </td>
+          <td class="td-email">{{ u.email }}</td>
+          <td>
+            <span class="badge" [style.color]="roles[u.role].color" [style.background]="roles[u.role].bg">
+              {{ roles[u.role].label }}
+            </span>
+          </td>
+          <td>
+            <span class="badge" [style.color]="u.active ? '#065F46' : '#991B1B'" [style.background]="u.active ? '#D1FAE5' : '#FEE2E2'">
+              {{ u.active ? 'Ativo' : 'Inativo' }}
+            </span>
+          </td>
+          <td class="td-date">{{ u.createdAt | slice:0:10 }}</td>
+          @if (auth.isSupervisorOrAbove()) {
+            <td>
+              <div class="action-btns">
+                <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px" (click)="openEdit(u)">Editar</button>
+                @if (auth.isAdmin()) {
+                  <button class="btn btn-danger" style="padding:5px 10px;font-size:12px" (click)="deleteUser(u)">Excluir</button>
+                }
+              </div>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editingUser() ? 'Editar Usuário' : 'Novo Usuário' }}</h2>
+        <button class="close-btn" (click)="closeModal()">&#10005;</button>
+      </div>
+
+      @if (formError) {
+        <div class="alert-error">{{ formError }}</div>
+      }
+
+      <div class="form-group">
+        <label>Nome <span style="color:#ef4444">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="form.name" placeholder="Nome completo"/>
+      </div>
+      <div class="form-group">
+        <label>E-mail <span style="color:#ef4444">*</span></label>
+        <input type="email" class="form-control" [(ngModel)]="form.email" placeholder="email@exemplo.com"/>
+      </div>
+      <div class="form-group">
+        <label>Perfil</label>
+        <select class="form-control" [(ngModel)]="form.role">
+          @for (k of roleKeys; track k) {
+            <option [value]="k">{{ roles[k].label }}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-control" [(ngModel)]="form.active">
+          <option [value]="true">Ativo</option>
+          <option [value]="false">Inativo</option>
+        </select>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="saveUser()">Salvar</button>
+      </div>
+    </div>
+  </div>
+}

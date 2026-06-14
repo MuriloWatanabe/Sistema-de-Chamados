@@ -1,0 +1,31 @@
+.form-card { max-width: 680px; }
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.breadcrumb a { color: #2563eb; text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+.alert-error {
+  background: #FEE2E2;
+  color: #991B1B;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.required { color: #ef4444; }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 8px;
+}

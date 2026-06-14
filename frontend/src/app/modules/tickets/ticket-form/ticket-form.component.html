@@ -1,0 +1,41 @@
+<div class="page-header">
+  <div>
+    <div class="breadcrumb">
+      <a routerLink="/tickets">Chamados</a>
+      <span>/</span>
+      <span>Novo</span>
+    </div>
+    <h1 class="page-title">Abrir Chamado</h1>
+  </div>
+</div>
+
+<div class="card form-card">
+  @if (error) {
+    <div class="alert-error">{{ error }}</div>
+  }
+
+  <div class="form-group">
+    <label for="title">Título <span class="required">*</span></label>
+    <input id="title" type="text" class="form-control" [(ngModel)]="form.title" placeholder="Descreva o problema brevemente" maxlength="200"/>
+  </div>
+
+  <div class="form-group">
+    <label for="desc">Descrição <span class="required">*</span></label>
+    <textarea id="desc" class="form-control" rows="5" [(ngModel)]="form.description"
+              placeholder="Descreva o problema com detalhes: o que aconteceu, quando, quais erros apareceram..."></textarea>
+  </div>
+
+  <div class="form-group">
+    <label for="priority">Prioridade</label>
+    <select id="priority" class="form-control" [(ngModel)]="form.priority">
+      @for (k of priorityKeys; track k) {
+        <option [value]="k">{{ priority[k].label }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="form-actions">
+    <a routerLink="/tickets" class="btn btn-secondary">Cancelar</a>
+    <button class="btn btn-primary" (click)="submit()">Abrir Chamado</button>
+  </div>
+</div>

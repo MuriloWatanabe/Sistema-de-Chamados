@@ -1,0 +1,21 @@
+.filters-card { padding: 14px 18px; }
+
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filters .form-control {
+  width: auto;
+  flex: 1;
+  min-width: 140px;
+}
+
+.td-id { color: #94a3b8; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.td-date { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+.td-title { max-width: 280px; }
+
+.ticket-link { color: #1e293b; font-weight: 500; text-decoration: none; }
+.ticket-link:hover { color: #2563eb; }

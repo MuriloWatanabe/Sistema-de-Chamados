@@ -1,0 +1,84 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Chamados</h1>
+    <p class="page-subtitle">{{ filtered.length }} chamado(s) encontrado(s)</p>
+  </div>
+  <a routerLink="/tickets/novo" class="btn btn-primary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+    Novo Chamado
+  </a>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <input type="text" class="form-control" placeholder="Buscar por título..." [(ngModel)]="filterSearch" (ngModelChange)="applyFilters()"/>
+    <select class="form-control" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+      <option value="">Todos os status</option>
+      @for (k of statusKeys; track k) {
+        <option [value]="k">{{ status[k].label }}</option>
+      }
+    </select>
+    <select class="form-control" [(ngModel)]="filterPriority" (ngModelChange)="applyFilters()">
+      <option value="">Todas as prioridades</option>
+      @for (k of priorityKeys; track k) {
+        <option [value]="k">{{ priority[k].label }}</option>
+      }
+    </select>
+    <button class="btn btn-secondary" (click)="clearFilters()">Limpar</button>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px; padding:0; overflow:hidden">
+  @if (filtered.length === 0) {
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        <rect x="9" y="3" width="6" height="4" rx="1"/>
+      </svg>
+      <p>Nenhum chamado encontrado</p>
+    </div>
+  } @else {
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Título</th>
+          <th>Status</th>
+          <th>Prioridade</th>
+          <th>Solicitante</th>
+          <th>Responsável</th>
+          <th>Criado em</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of filtered; track t.id) {
+          <tr>
+            <td class="td-id">#{{ t.id }}</td>
+            <td class="td-title">
+              <a [routerLink]="['/tickets', t.id]" class="ticket-link">{{ t.title }}</a>
+            </td>
+            <td>
+              <span class="badge" [style.color]="status[t.status].color" [style.background]="status[t.status].bg">
+                {{ status[t.status].label }}
+              </span>
+            </td>
+            <td>
+              <span class="badge" [style.color]="priority[t.priority].color" [style.background]="priority[t.priority].bg">
+                {{ priority[t.priority].label }}
+              </span>
+            </td>
+            <td>{{ t.requester.name }}</td>
+            <td>{{ t.assignedTo?.name ?? '—' }}</td>
+            <td class="td-date">{{ t.createdAt | slice:0:10 }}</td>
+            <td>
+              <a [routerLink]="['/tickets', t.id]" class="btn btn-secondary" style="padding:5px 10px;font-size:12px">Ver</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

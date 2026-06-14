@@ -1,0 +1,122 @@
+@if (!ticket) {
+  <div class="card empty-state">
+    <p>Chamado não encontrado.</p>
+    <a routerLink="/tickets" class="btn btn-secondary" style="margin-top:12px">Voltar</a>
+  </div>
+} @else {
+  <div class="page-header">
+    <div>
+      <div class="breadcrumb">
+        <a routerLink="/tickets">Chamados</a>
+        <span>/</span>
+        <span>#{{ ticket.id }}</span>
+      </div>
+      <h1 class="page-title">{{ ticket.title }}</h1>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="main-col">
+      <div class="card">
+        <h3 class="section-label">Descrição</h3>
+        <p class="description">{{ ticket.description }}</p>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 class="section-label">Comentários ({{ comments.length }})</h3>
+
+        <div class="comments-list">
+          @for (c of comments; track c.id) {
+            <div class="comment">
+              <div class="comment-avatar">{{ getInitials(c.user.name) }}</div>
+              <div class="comment-body">
+                <div class="comment-header">
+                  <span class="comment-author">{{ c.user.name }}</span>
+                  <span class="comment-role badge" [style.color]="roles[c.user.role].color" [style.background]="roles[c.user.role].bg">
+                    {{ roles[c.user.role].label }}
+                  </span>
+                  <span class="comment-date">{{ formatDate(c.createdAt) }}</span>
+                </div>
+                <p class="comment-text">{{ c.comment }}</p>
+              </div>
+            </div>
+          }
+          @if (comments.length === 0) {
+            <p style="color:#94a3b8;font-size:13px;padding:8px 0">Nenhum comentário ainda.</p>
+          }
+        </div>
+
+        <div class="comment-form">
+          <textarea class="form-control" rows="3" placeholder="Adicionar comentário..." [(ngModel)]="newComment"></textarea>
+          <button class="btn btn-primary" style="margin-top:8px" (click)="submitComment()" [disabled]="!newComment.trim()">
+            Comentar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col">
+      <div class="card">
+        <h3 class="section-label">Detalhes</h3>
+
+        <div class="detail-item">
+          <span class="detail-key">Status</span>
+          @if (canManage) {
+            <select class="form-control" [value]="ticket.status" (change)="changeStatus(+($any($event.target).value))">
+              @for (k of statusKeys; track k) {
+                <option [value]="k">{{ status[k].label }}</option>
+              }
+            </select>
+          } @else {
+            <span class="badge" [style.color]="status[ticket.status].color" [style.background]="status[ticket.status].bg">
+              {{ status[ticket.status].label }}
+            </span>
+          }
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-key">Prioridade</span>
+          <span class="badge" [style.color]="priority[ticket.priority].color" [style.background]="priority[ticket.priority].bg">
+            {{ priority[ticket.priority].label }}
+          </span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-key">Solicitante</span>
+          <span class="detail-val">{{ ticket.requester.name }}</span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-key">Responsável</span>
+          @if (canManage) {
+            <select class="form-control" [value]="ticket.assignedTo?.id ?? ''" (change)="assignTechnician($any($event.target).value)">
+              <option value="">Não atribuído</option>
+              @for (t of technicians; track t.id) {
+                <option [value]="t.id">{{ t.name }}</option>
+              }
+            </select>
+          } @else {
+            <span class="detail-val">{{ ticket.assignedTo?.name ?? '—' }}</span>
+          }
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-key">Criado em</span>
+          <span class="detail-val">{{ formatDate(ticket.createdAt) }}</span>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-key">Atualizado</span>
+          <span class="detail-val">{{ formatDate(ticket.updatedAt) }}</span>
+        </div>
+
+        @if (ticket.closedAt) {
+          <div class="detail-item">
+            <span class="detail-key">Fechado em</span>
+            <span class="detail-val">{{ formatDate(ticket.closedAt) }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}

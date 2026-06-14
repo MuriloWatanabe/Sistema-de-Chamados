@@ -1,0 +1,46 @@
+<div class="login-page">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-logo">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" fill="#2563EB"/>
+          <path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1>HelpDesk</h1>
+      <p>Sistema de Chamados</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" class="login-form">
+      @if (error()) {
+        <div class="alert-error">{{ error() }}</div>
+      }
+
+      <div class="form-group">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" class="form-control" [(ngModel)]="email" name="email"
+               placeholder="seu@email.com" required autocomplete="email"/>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <input id="password" type="password" class="form-control" [(ngModel)]="password" name="password"
+               placeholder="••••••••" required autocomplete="current-password"/>
+      </div>
+
+      <button type="submit" class="btn-login" [disabled]="loading()">
+        @if (loading()) { Entrando... } @else { Entrar }
+      </button>
+    </form>
+
+    <div class="hints">
+      <p class="hints-title">Acesso rápido (mockup)</p>
+      @for (h of hints; track h.email) {
+        <button class="hint-item" type="button" (click)="fillCredentials(h.email, h.pass)">
+          <span class="hint-role">{{ h.role }}</span>
+          <span class="hint-email">{{ h.email }}</span>
+        </button>
+      }
+    </div>
+  </div>
+</div>
