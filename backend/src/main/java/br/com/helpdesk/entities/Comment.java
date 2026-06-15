@@ -36,7 +36,7 @@ public class Comment {
     @JoinColumn(name = "USER_ID", nullable = false)
     private User user;
 
-    @Column(name = "COMMENT_TEXT", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "COMMENT_TEXT", nullable = false, columnDefinition = "text")
     private String comment;
 
     @CreationTimestamp

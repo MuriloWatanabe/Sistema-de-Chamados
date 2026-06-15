@@ -34,7 +34,7 @@
     </form>
 
     <div class="hints">
-      <p class="hints-title">Acesso rápido (mockup)</p>
+      <p class="hints-title">Acesso rápido</p>
       @for (h of hints; track h.email) {
         <button class="hint-item" type="button" (click)="fillCredentials(h.email, h.pass)">
           <span class="hint-role">{{ h.role }}</span>

@@ -25,6 +25,26 @@ Isso vai subir:
 - O backend usa as variaveis de ambiente passadas pelo `compose`.
 - As tabelas sao criadas/atualizadas automaticamente pelo Hibernate na inicializacao.
 
+## Acesso inicial
+
+O backend sobe com dados iniciais para demonstracao:
+
+- `admin@helpdesk.com` / `admin123`
+- `supervisor@helpdesk.com` / `super123`
+- `tecnico@helpdesk.com` / `tecnico123`
+- `solicitante@helpdesk.com` / `solicitante123`
+
+Enderecos principais:
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET /api/tickets`
+- `GET /api/tickets/{id}`
+- `POST /api/tickets`
+- `PATCH /api/tickets/{id}`
+- `GET /api/users`
+- `GET /api/dashboard/stats`
+
 ## Banco de dados
 
 Configuracao usada no ambiente Docker:

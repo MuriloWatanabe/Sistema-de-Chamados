@@ -32,7 +32,7 @@ public class Ticket {
     @Column(name = "TITLE", nullable = false, length = 200)
     private String title;
 
-    @Column(name = "DESCRIPTION", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "DESCRIPTION", nullable = false, columnDefinition = "text")
     private String description;
 
     @Column(name = "STATUS", nullable = false)

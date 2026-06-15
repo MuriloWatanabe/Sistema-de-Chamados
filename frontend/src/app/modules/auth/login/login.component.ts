@@ -31,17 +31,15 @@ export class LoginComponent {
     this.password = pass;
   }
 
-  onSubmit() {
+  async onSubmit() {
     this.error.set('');
     this.loading.set(true);
-    setTimeout(() => {
-      const ok = this.auth.login(this.email, this.password);
-      this.loading.set(false);
-      if (ok) {
-        this.router.navigate(['/dashboard']);
-      } else {
-        this.error.set('E-mail ou senha incorretos.');
-      }
-    }, 400);
+    const ok = await this.auth.login(this.email, this.password);
+    this.loading.set(false);
+    if (ok) {
+      this.router.navigate(['/dashboard']);
+    } else {
+      this.error.set('E-mail ou senha incorretos.');
+    }
   }
 }
