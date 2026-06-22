@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 
@@ -32,6 +33,11 @@ export const routes: Routes = [
       {
         path: 'usuarios',
         loadComponent: () => import('./modules/users/user-list/user-list.component').then(m => m.UserListComponent),
+      },
+      {
+        path: 'logs',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./modules/logs/logs.component').then(m => m.LogsComponent),
       },
     ],
   },

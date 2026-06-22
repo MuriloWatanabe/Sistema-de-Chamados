@@ -1,0 +1,194 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Auditoria</h1>
+    <p class="page-subtitle">{{ filteredEntries.length }} de {{ entries.length }} registros</p>
+  </div>
+  <div class="header-actions">
+    <a routerLink="/dashboard" class="btn btn-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+      Dashboard
+    </a>
+    <button class="btn btn-primary" type="button" (click)="load()" [disabled]="loading">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12a9 9 0 10-3.3 6.9" />
+        <path d="M21 3v6h-6" />
+      </svg>
+      {{ loading ? 'Atualizando' : 'Atualizar' }}
+    </button>
+  </div>
+</div>
+
+<div class="audit-stats">
+  <div class="stat-box">
+    <span>Registros</span>
+    <strong>{{ summary.total }}</strong>
+  </div>
+  <div class="stat-box">
+    <span>Usuarios</span>
+    <strong>{{ summary.users }}</strong>
+  </div>
+  <div class="stat-box">
+    <span>Chamados</span>
+    <strong>{{ summary.tickets }}</strong>
+  </div>
+  <div class="stat-box">
+    <span>Comentarios</span>
+    <strong>{{ summary.comments }}</strong>
+  </div>
+  <div class="stat-box">
+    <span>Auth</span>
+    <strong>{{ summary.auth }}</strong>
+  </div>
+</div>
+
+<div class="card audit-toolbar">
+  <div class="filters-grid">
+    <div class="form-group">
+      <label>Buscar</label>
+      <input
+        type="text"
+        class="form-control"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="applyFilters()"
+        placeholder="Usuario, acao, entidade ou id"
+      />
+    </div>
+
+    <div class="form-group">
+      <label>Entidade</label>
+      <select class="form-control" [(ngModel)]="entityFilter" (ngModelChange)="applyFilters()">
+        <option value="">Todas</option>
+        @for (key of entityKeys; track key) {
+          <option [value]="key">{{ entityLabel(key) }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="toolbar-actions">
+      <button class="btn btn-secondary" type="button" (click)="clearFilters()">Limpar</button>
+    </div>
+  </div>
+</div>
+
+@if (error) {
+  <div class="alert-error">{{ error }}</div>
+}
+
+<div class="audit-layout">
+  <section class="card audit-table-card">
+    <div class="audit-table-wrap">
+      <table class="table audit-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Usuario</th>
+            <th>Acao</th>
+            <th>Entidade</th>
+            <th>ID</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of filteredEntries; track entry.id) {
+            <tr [class.selected-row]="selectedEntry?.id === entry.id">
+              <td class="td-date">{{ formatDateTime(entry.createdAt) }}</td>
+              <td>
+                <div class="user-cell">
+                  <div class="avatar-sm">{{ getInitials(entry.user.name) }}</div>
+                  <div class="user-meta">
+                    <div class="user-name">{{ entry.user.name }}</div>
+                    <div class="td-email">{{ entry.user.email }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge action-badge">{{ formatAction(entry.action) }}</span>
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  [style.color]="entityStyle(entry.entityType).color"
+                  [style.background]="entityStyle(entry.entityType).bg"
+                >
+                  {{ entityLabel(entry.entityType) }}
+                </span>
+              </td>
+              <td class="td-id">#{{ entry.entityId }}</td>
+              <td class="td-actions">
+                <button class="btn btn-secondary" type="button" (click)="selectEntry(entry)">Ver</button>
+              </td>
+            </tr>
+          }
+
+          @if (filteredEntries.length === 0) {
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <p>Nenhum log encontrado.</p>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="card audit-detail-card">
+    @if (selectedEntry) {
+      <div class="detail-header">
+        <div>
+          <p class="detail-kicker">Detalhe do registro</p>
+          <h2 class="detail-title">{{ formatAction(selectedEntry.action) }}</h2>
+          <p class="detail-subtitle">{{ formatDateTime(selectedEntry.createdAt) }}</p>
+        </div>
+
+        <span
+          class="badge"
+          [style.color]="entityStyle(selectedEntry.entityType).color"
+          [style.background]="entityStyle(selectedEntry.entityType).bg"
+        >
+          {{ entityLabel(selectedEntry.entityType) }}
+        </span>
+      </div>
+
+      <div class="detail-meta">
+        <div class="meta-row">
+          <span>Usuario</span>
+          <strong>{{ selectedEntry.user.name }}</strong>
+        </div>
+        <div class="meta-row">
+          <span>E-mail</span>
+          <strong>{{ selectedEntry.user.email }}</strong>
+        </div>
+        <div class="meta-row">
+          <span>Perfil</span>
+          <span class="badge" [style.color]="roles[selectedEntry.user.role].color" [style.background]="roles[selectedEntry.user.role].bg">
+            {{ roles[selectedEntry.user.role].label }}
+          </span>
+        </div>
+        <div class="meta-row">
+          <span>Entidade ID</span>
+          <strong>#{{ selectedEntry.entityId }}</strong>
+        </div>
+      </div>
+
+      <div class="json-grid">
+        <div class="json-panel">
+          <h3>Antes</h3>
+          <pre>{{ formatJson(selectedEntry.oldValue) }}</pre>
+        </div>
+        <div class="json-panel">
+          <h3>Depois</h3>
+          <pre>{{ formatJson(selectedEntry.newValue) }}</pre>
+        </div>
+      </div>
+    } @else {
+      <div class="detail-empty">
+        <p>Selecione um registro para ver os detalhes.</p>
+      </div>
+    }
+  </aside>
+</div>

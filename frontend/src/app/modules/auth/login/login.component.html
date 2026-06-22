@@ -25,7 +25,7 @@
       <div class="form-group">
         <label for="password">Senha</label>
         <input id="password" type="password" class="form-control" [(ngModel)]="password" name="password"
-               placeholder="••••••••" required autocomplete="current-password"/>
+               placeholder="********" required autocomplete="current-password"/>
       </div>
 
       <button type="submit" class="btn-login" [disabled]="loading()">
@@ -34,7 +34,7 @@
     </form>
 
     <div class="hints">
-      <p class="hints-title">Acesso rápido</p>
+      <p class="hints-title">Acesso rapido</p>
       @for (h of hints; track h.email) {
         <button class="hint-item" type="button" (click)="fillCredentials(h.email, h.pass)">
           <span class="hint-role">{{ h.role }}</span>

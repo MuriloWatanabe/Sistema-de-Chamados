@@ -23,7 +23,7 @@
         </svg>
         Chamados
       </a>
-      @if (auth.isTechnicianOrAbove()) {
+      @if (auth.isLoggedIn()) {
         <a routerLink="/tickets/novo" routerLinkActive="active" class="nav-item">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
@@ -37,7 +37,16 @@
             <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
             <circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
           </svg>
-          Usuários
+          Usuarios
+        </a>
+      }
+      @if (auth.isAdmin()) {
+        <a routerLink="/logs" routerLinkActive="active" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 5h14v14H5z"/>
+            <path d="M7 8h10M7 12h10M7 16h6"/>
+          </svg>
+          Logs
         </a>
       }
     </nav>

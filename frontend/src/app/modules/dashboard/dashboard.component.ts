@@ -2,8 +2,9 @@ import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SlicePipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
-import { MockDataService } from '../../core/services/mock-data.service';
-import { STATUS, PRIORITY, Ticket } from '../../core/models/ticket.model';
+import { HelpdeskApiService } from '../../core/services/helpdesk-api.service';
+import { DashboardStats } from '../../core/models/api-contracts';
+import { PRIORITY, STATUS, Ticket } from '../../core/models/ticket.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -14,9 +15,9 @@ import { STATUS, PRIORITY, Ticket } from '../../core/models/ticket.model';
 })
 export class DashboardComponent implements OnInit {
   auth = inject(AuthService);
-  private data = inject(MockDataService);
+  private api = inject(HelpdeskApiService);
 
-  stats: { total: number; open: number; inProgress: number; resolved: number; closed: number; urgent: number } | null = null;
+  stats: DashboardStats | null = null;
   recentTickets: Ticket[] = [];
   status = STATUS;
   priority = PRIORITY;
@@ -30,11 +31,17 @@ export class DashboardComponent implements OnInit {
     return 'Boa noite';
   }
 
-  ngOnInit() {
-    this.stats = this.data.getDashboardStats();
-    const tickets = this.auth.isTechnicianOrAbove()
-      ? this.data.getTickets()
-      : this.data.getTicketsByRequesterId(this.user!.id);
-    this.recentTickets = tickets.slice(0, 5);
+  async ngOnInit() {
+    try {
+      const [stats, tickets] = await Promise.all([
+        this.api.getDashboardStats(),
+        this.api.listTickets(),
+      ]);
+      this.stats = stats;
+      this.recentTickets = tickets.slice(0, 5);
+    } catch {
+      this.stats = null;
+      this.recentTickets = [];
+    }
   }
 }

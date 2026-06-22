@@ -29,7 +29,7 @@
     <label for="priority">Prioridade</label>
     <select id="priority" class="form-control" [(ngModel)]="form.priority">
       @for (k of priorityKeys; track k) {
-        <option [value]="k">{{ priority[k].label }}</option>
+        <option [ngValue]="k">{{ priority[k].label }}</option>
       }
     </select>
   </div>

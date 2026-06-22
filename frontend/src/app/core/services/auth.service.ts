@@ -1,7 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { User } from '../models/user.model';
-import { MOCK_USERS, CREDENTIALS } from './mock-data.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -12,9 +11,18 @@ export class AuthService {
   readonly currentUser$ = this._currentUser;
 
   constructor(private router: Router) {
-    const stored = localStorage.getItem('hd_user');
-    if (stored) {
-      try { this._currentUser.set(JSON.parse(stored)); } catch { localStorage.removeItem('hd_user'); }
+    const storedUser = localStorage.getItem('hd_user');
+    const storedToken = localStorage.getItem('hd_token');
+
+    if (storedUser && storedToken) {
+      try {
+        this._currentUser.set(JSON.parse(storedUser));
+        void this.validateStoredSession();
+      } catch {
+        this.clearSession();
+      }
+    } else {
+      this.clearSession();
     }
   }
 
@@ -24,22 +32,24 @@ export class AuthService {
       this.setCurrentUser(backendUser.user, backendUser.token);
       return true;
     }
-
-    if (CREDENTIALS[email] !== password) return false;
-    const user = MOCK_USERS.find(u => u.email === email);
-    if (!user) return false;
-    this.setCurrentUser(user, 'mock-token');
-    return true;
+    return false;
   }
 
   logout() {
-    this._currentUser.set(null);
-    localStorage.removeItem('hd_user');
-    localStorage.removeItem('hd_token');
+    this.clearSession();
     this.router.navigate(['/login']);
   }
 
-  isLoggedIn(): boolean { return this._currentUser() !== null; }
+  isLoggedIn(): boolean { return this._currentUser() !== null && !!this.token; }
+
+  get token(): string | null {
+    return localStorage.getItem('hd_token');
+  }
+
+  authHeaders(): Record<string, string> {
+    const token = this.token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
   hasRole(...roles: number[]): boolean {
     const user = this._currentUser();
@@ -63,6 +73,9 @@ export class AuthService {
       }
 
       const payload = await response.json();
+      if (!payload?.user || !payload?.token) {
+        return null;
+      }
       return {
         user: payload.user as User,
         token: payload.token as string,
@@ -72,9 +85,42 @@ export class AuthService {
     }
   }
 
+  private async validateStoredSession() {
+    const token = this.token;
+    if (!token) {
+      this.clearSession();
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid session');
+      }
+
+      const user = (await response.json()) as User;
+      this._currentUser.set(user);
+      localStorage.setItem('hd_user', JSON.stringify(user));
+    } catch {
+      this.clearSession();
+      if (this.router.url !== '/login') {
+        this.router.navigate(['/login']);
+      }
+    }
+  }
+
   private setCurrentUser(user: User, token: string) {
     this._currentUser.set(user);
     localStorage.setItem('hd_user', JSON.stringify(user));
     localStorage.setItem('hd_token', token);
+  }
+
+  private clearSession() {
+    this._currentUser.set(null);
+    localStorage.removeItem('hd_user');
+    localStorage.removeItem('hd_token');
   }
 }

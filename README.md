@@ -9,9 +9,9 @@ Este README descreve o que existe hoje no projeto, como o fluxo funciona na prat
 ## Estado atual do projeto
 
 - O backend esta real e persistente.
-- O frontend esta hibrido: o login tenta o backend, mas as telas de dashboard, chamados e usuarios ainda usam dados em memoria via `MockDataService`.
+- O frontend agora consome o backend real para login, dashboard, chamados, usuarios e auditoria.
 - O token JWT e o usuario logado sao salvos no `localStorage` como `hd_user` e `hd_token`.
-- O token ainda nao e anexado em outras requisicoes porque as telas fora do login ainda nao consomem a API real.
+- As requisicoes autenticadas usam Bearer token.
 
 ---
 
@@ -20,17 +20,17 @@ Este README descreve o que existe hoje no projeto, como o fluxo funciona na prat
 1. A aplicacao abre em `/login`.
 2. `AuthService` tenta autenticar em `POST /api/auth/login`.
 3. Se o backend responder, o usuario e o token sao salvos e a navegacao vai para `/dashboard`.
-4. Se o backend nao responder, o frontend cai no modo demo com credenciais locais.
-5. `authGuard` so verifica se existe usuario logado.
+4. Se o backend nao responder ou negar acesso, o login falha.
+5. `authGuard` verifica se existe sessao carregada.
 6. `MainLayout` monta o menu conforme o papel do usuario.
-7. As telas de dashboard, chamados e usuarios leem e alteram dados em memoria no frontend.
-8. O backend, quando usado, persiste em PostgreSQL e grava auditoria.
+7. As telas de dashboard, chamados, usuarios e logs leem e alteram dados na API.
+8. O backend persiste em PostgreSQL e grava auditoria.
 
 Fluxo resumido da requisicao:
 
 ```text
 Browser -> Angular login -> POST /api/auth/login -> JWT -> localStorage
-Browser -> Angular telas -> MockDataService -> arrays em memoria
+Browser -> Angular telas -> API REST -> PostgreSQL
 ```
 
 Fluxo real do backend:
@@ -69,6 +69,7 @@ Request -> TokenAuthenticationFilter -> SecurityContext -> Controller -> Service
 
 - `HelpdeskApplication`: ponto de entrada do Spring Boot.
 - `SecurityConfig`: configura JWT, CORS, sessao stateless e regras de acesso.
+- `JwtService`: gera e valida tokens assinados com HMAC SHA-256.
 - `TokenAuthenticationFilter`: valida o Bearer token em cada request autenticada.
 - `CurrentUserService`: resolve o usuario autenticado a partir do `Authentication`.
 - `DataInitializer`: cria dados iniciais quando o banco esta vazio.
@@ -77,14 +78,18 @@ Request -> TokenAuthenticationFilter -> SecurityContext -> Controller -> Service
 
 ### Regras de autenticacao e seguranca
 
-- A senha e armazenada com `BCryptPasswordEncoder`.
-- O login so aceita usuario ativo.
-- O JWT e assinado com HMAC SHA-256.
+- A coluna `PASSWORD` em `USERS` guarda somente hash bcrypt; a senha nunca fica em texto puro.
+- O login so aceita usuario ativo e compara a senha com `passwordEncoder.matches(...)`.
+- Ao criar ou atualizar usuario, o backend chama `passwordEncoder.encode(...)` antes de salvar.
+- O JWT e assinado com HMAC SHA-256 usando `app.security.jwt.secret`.
+- O token carrega `uid`, `name`, `email`, `role`, `iat` e `exp`, e expira por padrao em 120 minutos.
+- Em cada request, `TokenAuthenticationFilter` valida assinatura, expiracao, usuario ativo e papel antes de montar o `SecurityContext`.
 - O backend libera apenas:
   - `POST /api/auth/login`
   - `GET /api/health`
 - O restante da API exige autenticacao.
 - O acesso por papel usa `@PreAuthorize`.
+- Os usuarios iniciais tambem sao gravados com hash bcrypt pelo `DataInitializer`.
 
 ### Papais de acesso
 
@@ -187,6 +192,7 @@ Request -> TokenAuthenticationFilter -> SecurityContext -> Controller -> Service
 | GET | `/api/tickets` | autenticado | listar chamados visiveis |
 | GET | `/api/tickets/{id}` | autenticado | detalhar chamado |
 | POST | `/api/tickets` | autenticado | criar chamado |
+| DELETE | `/api/tickets/{id}` | admin | excluir chamado |
 | PATCH | `/api/tickets/{id}` | technician+ | atualizar status, prioridade ou responsavel |
 | GET | `/api/tickets/{id}/comments` | autenticado | listar comentarios |
 | POST | `/api/tickets/{id}/comments` | autenticado | adicionar comentario |
@@ -273,31 +279,30 @@ Defaults atuais:
 
 - `AuthService`
   - tenta login real no backend
-  - faz fallback para credenciais locais se a API falhar
+  - valida a sessao salva com `/api/auth/me`
   - guarda o usuario no `localStorage`
 - `authGuard`
   - libera rotas apenas se existir usuario logado
 - `MainLayoutComponent`
   - monta sidebar e cabecalho
   - esconde ou mostra opcoes por papel
-- `MockDataService`
-  - guarda usuarios, chamados e comentarios em memoria
-  - cria, edita e exclui dados sem persistir no banco
+- `HelpdeskApiService`
+  - centraliza chamadas autenticadas para tickets, usuarios e dashboard
+- `AuditService`
+  - carrega os registros de auditoria para a tela `/logs`
 
 ### O que esta real e o que e mock no frontend
 
 Real:
 
 - login em `POST http://localhost:8080/api/auth/login`
-- recuperacao do usuario autenticado no cache local
-
-Mock:
-
+- recuperacao do usuario autenticado em `GET /api/auth/me`
 - dashboard
 - lista de chamados
 - detalhe de chamado
 - abertura de chamado
 - listagem e edicao de usuarios
+- auditoria em `/logs`
 
 ### Mapas de dominio no frontend
 
@@ -394,4 +399,3 @@ Frontend:
 - `frontend/README.md`: README gerado pelo Angular.
 - `docs/Matriz de Permissoes.pdf`: matriz de permissao do projeto.
 - `docs/Planejamento Tecnico e Modelo de Dados.pdf`: planejamento e modelagem.
-

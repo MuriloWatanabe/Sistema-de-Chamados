@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class TicketService {
@@ -99,6 +101,26 @@ public class TicketService {
     }
 
     @Transactional
+    public void deleteTicket(Long id, User actor) {
+        assertCanDeleteTickets(actor);
+        Ticket ticket = loadTicket(id);
+        TicketResponse before = DtoMapper.toTicketResponse(ticket);
+        int deletedComments = commentRepository.deleteByTicketId(id);
+        ticketRepository.delete(ticket);
+        auditService.record(
+                actor,
+                "TICKET_DELETED",
+                AuditEntityType.TICKET,
+                id,
+                Map.of(
+                        "ticket", before,
+                        "deletedComments", deletedComments
+                ),
+                null
+        );
+    }
+
+    @Transactional
     public TicketResponse updateTicket(Long id, User actor, TicketUpdateRequest request) {
         Ticket ticket = loadTicket(id);
         assertCanManageTickets(actor);
@@ -114,17 +136,32 @@ public class TicketService {
             ticket.setPriority(TicketPriority.fromCode(request.priority()).getCode());
         }
 
-        User assignedTo = request.assignedToId() == null ? null : resolveAssignable(request.assignedToId());
-        ticket.setAssignedTo(assignedTo);
-        if (assignedTo == null && ticket.getStatus() != TicketStatus.CLOSED.getCode()) {
-            ticket.setStatus(TicketStatus.OPEN.getCode());
-        } else if (assignedTo != null && ticket.getStatus() == TicketStatus.OPEN.getCode()) {
-            ticket.setStatus(TicketStatus.IN_PROGRESS.getCode());
+        if (request.assignedToId() != null) {
+            User assignedTo = resolveAssignable(request.assignedToId());
+            ticket.setAssignedTo(assignedTo);
+            if (assignedTo == null && ticket.getStatus() != TicketStatus.CLOSED.getCode()) {
+                ticket.setStatus(TicketStatus.OPEN.getCode());
+            } else if (assignedTo != null && ticket.getStatus() == TicketStatus.OPEN.getCode()) {
+                ticket.setStatus(TicketStatus.IN_PROGRESS.getCode());
+            }
         }
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
-        auditService.record(actor, "TICKET_UPDATED", AuditEntityType.TICKET, saved.getId(), before, DtoMapper.toTicketResponse(saved));
-        return DtoMapper.toTicketResponse(saved);
+        TicketResponse after = DtoMapper.toTicketResponse(saved);
+
+        if (!Objects.equals(before.status(), after.status())) {
+            auditService.record(actor, "TICKET_STATUS_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+        if (!Objects.equals(before.priority(), after.priority())) {
+            auditService.record(actor, "TICKET_PRIORITY_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+        Long beforeAssignedToId = before.assignedTo() == null ? null : before.assignedTo().id();
+        Long afterAssignedToId = after.assignedTo() == null ? null : after.assignedTo().id();
+        if (!Objects.equals(beforeAssignedToId, afterAssignedToId)) {
+            auditService.record(actor, "TICKET_ASSIGNED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+
+        return after;
     }
 
     @Transactional
@@ -137,9 +174,13 @@ public class TicketService {
         ticket.setStatus(status.getCode());
         ticket.setClosedAt(status.isClosed() ? LocalDateTime.now() : null);
         Ticket saved = ticketRepository.saveAndFlush(ticket);
+        TicketResponse after = DtoMapper.toTicketResponse(saved);
 
-        auditService.record(actor, "TICKET_STATUS_UPDATED", AuditEntityType.TICKET, saved.getId(), before, DtoMapper.toTicketResponse(saved));
-        return DtoMapper.toTicketResponse(saved);
+        if (!Objects.equals(before.status(), after.status())) {
+            auditService.record(actor, "TICKET_STATUS_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+
+        return after;
     }
 
     @Transactional
@@ -150,9 +191,13 @@ public class TicketService {
 
         ticket.setPriority(TicketPriority.fromCode(priorityCode).getCode());
         Ticket saved = ticketRepository.saveAndFlush(ticket);
+        TicketResponse after = DtoMapper.toTicketResponse(saved);
 
-        auditService.record(actor, "TICKET_PRIORITY_UPDATED", AuditEntityType.TICKET, saved.getId(), before, DtoMapper.toTicketResponse(saved));
-        return DtoMapper.toTicketResponse(saved);
+        if (!Objects.equals(before.priority(), after.priority())) {
+            auditService.record(actor, "TICKET_PRIORITY_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+
+        return after;
     }
 
     @Transactional
@@ -170,8 +215,15 @@ public class TicketService {
         }
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
-        auditService.record(actor, "TICKET_ASSIGNED", AuditEntityType.TICKET, saved.getId(), before, DtoMapper.toTicketResponse(saved));
-        return DtoMapper.toTicketResponse(saved);
+        TicketResponse after = DtoMapper.toTicketResponse(saved);
+        Long beforeAssignedToId = before.assignedTo() == null ? null : before.assignedTo().id();
+        Long afterAssignedToId = after.assignedTo() == null ? null : after.assignedTo().id();
+
+        if (!Objects.equals(beforeAssignedToId, afterAssignedToId)) {
+            auditService.record(actor, "TICKET_ASSIGNED", AuditEntityType.TICKET, saved.getId(), before, after);
+        }
+
+        return after;
     }
 
     @Transactional(readOnly = true)
@@ -233,6 +285,12 @@ public class TicketService {
     private void assertCanManageTickets(User actor) {
         if (actor == null || !UserRole.fromCode(actor.getRole()).hasAccessAtLeast(UserRole.TECHNICIAN)) {
             throw new ForbiddenOperationException("You do not have permission to manage tickets.");
+        }
+    }
+
+    private void assertCanDeleteTickets(User actor) {
+        if (actor == null || !UserRole.fromCode(actor.getRole()).hasAccessAtLeast(UserRole.ADMIN)) {
+            throw new ForbiddenOperationException("You do not have permission to delete tickets.");
         }
     }
 

@@ -10,6 +10,7 @@ import br.com.helpdesk.security.CurrentUserService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,6 +48,12 @@ public class TicketController {
     @PreAuthorize("isAuthenticated()")
     public TicketResponse createTicket(@Valid @RequestBody TicketCreateRequest request, Authentication authentication) {
         return ticketService.createTicket(currentUserService.requireUser(authentication), request);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public void deleteTicket(@PathVariable Long id, Authentication authentication) {
+        ticketService.deleteTicket(id, currentUserService.requireUser(authentication));
     }
 
     @PatchMapping("/{id}")

@@ -1,9 +1,9 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SlicePipe } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
-import { MockDataService } from '../../../core/services/mock-data.service';
+import { HelpdeskApiService } from '../../../core/services/helpdesk-api.service';
 import { STATUS, PRIORITY, Ticket } from '../../../core/models/ticket.model';
 
 @Component({
@@ -15,7 +15,7 @@ import { STATUS, PRIORITY, Ticket } from '../../../core/models/ticket.model';
 })
 export class TicketListComponent implements OnInit {
   auth = inject(AuthService);
-  private dataService = inject(MockDataService);
+  private api = inject(HelpdeskApiService);
 
   allTickets: Ticket[] = [];
   filtered: Ticket[] = [];
@@ -26,15 +26,18 @@ export class TicketListComponent implements OnInit {
   filterPriority = '';
   filterSearch = '';
 
-  ngOnInit() {
-    this.load();
+  async ngOnInit() {
+    await this.load();
   }
 
-  load() {
-    this.allTickets = this.auth.isTechnicianOrAbove()
-      ? this.dataService.getTickets()
-      : this.dataService.getTicketsByRequesterId(this.auth.currentUser!.id);
-    this.applyFilters();
+  async load() {
+    try {
+      this.allTickets = await this.api.listTickets();
+      this.applyFilters();
+    } catch {
+      this.allTickets = [];
+      this.filtered = [];
+    }
   }
 
   applyFilters() {

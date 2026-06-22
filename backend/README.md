@@ -25,6 +25,14 @@ Isso vai subir:
 - O backend usa as variaveis de ambiente passadas pelo `compose`.
 - As tabelas sao criadas/atualizadas automaticamente pelo Hibernate na inicializacao.
 
+## Seguranca
+
+- O login gera um JWT assinado com HMAC SHA-256.
+- O token expira por padrao em 120 minutos.
+- O filtro de autenticacao valida assinatura, expiracao, usuario ativo e papel antes de liberar a request.
+- As senhas sao salvas como hash bcrypt no campo `PASSWORD` da tabela `USERS`.
+- O backend nunca grava senha em texto puro, nem no login nem no seed inicial.
+
 ## Acesso inicial
 
 O backend sobe com dados iniciais para demonstracao:
@@ -41,9 +49,13 @@ Enderecos principais:
 - `GET /api/tickets`
 - `GET /api/tickets/{id}`
 - `POST /api/tickets`
+- `DELETE /api/tickets/{id}`
 - `PATCH /api/tickets/{id}`
+- `GET /api/tickets/{id}/comments`
+- `POST /api/tickets/{id}/comments`
 - `GET /api/users`
 - `GET /api/dashboard/stats`
+- `GET /api/audits`
 
 ## Banco de dados
 

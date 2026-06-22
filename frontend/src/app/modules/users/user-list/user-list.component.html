@@ -83,18 +83,23 @@
         <input type="email" class="form-control" [(ngModel)]="form.email" placeholder="email@exemplo.com"/>
       </div>
       <div class="form-group">
+        <label>Senha</label>
+        <input type="password" class="form-control" [(ngModel)]="form.password"
+               [placeholder]="editingUser() ? 'Deixe em branco para manter' : 'Senha inicial'"/>
+      </div>
+      <div class="form-group">
         <label>Perfil</label>
         <select class="form-control" [(ngModel)]="form.role">
           @for (k of roleKeys; track k) {
-            <option [value]="k">{{ roles[k].label }}</option>
+            <option [ngValue]="k">{{ roles[k].label }}</option>
           }
         </select>
       </div>
       <div class="form-group">
         <label>Status</label>
         <select class="form-control" [(ngModel)]="form.active">
-          <option [value]="true">Ativo</option>
-          <option [value]="false">Inativo</option>
+          <option [ngValue]="true">Ativo</option>
+          <option [ngValue]="false">Inativo</option>
         </select>
       </div>
 

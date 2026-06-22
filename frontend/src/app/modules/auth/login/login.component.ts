@@ -22,7 +22,7 @@ export class LoginComponent {
   readonly hints = [
     { role: 'Administrador', email: 'admin@helpdesk.com', pass: 'admin123' },
     { role: 'Supervisor', email: 'supervisor@helpdesk.com', pass: 'super123' },
-    { role: 'Técnico', email: 'tecnico@helpdesk.com', pass: 'tecnico123' },
+    { role: 'Tecnico', email: 'tecnico@helpdesk.com', pass: 'tecnico123' },
     { role: 'Solicitante', email: 'solicitante@helpdesk.com', pass: 'solicitante123' },
   ];
 

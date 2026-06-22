@@ -100,3 +100,12 @@
 }
 
 .detail-val { font-size: 13.5px; color: #1e293b; font-weight: 500; }
+
+.alert-error {
+  background: #FEE2E2;
+  color: #991B1B;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}

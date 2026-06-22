@@ -1,6 +1,15 @@
-@if (!ticket) {
+@if (loading) {
   <div class="card empty-state">
-    <p>Chamado não encontrado.</p>
+    <p>Carregando chamado...</p>
+  </div>
+} @else if (error && !ticket) {
+  <div class="card empty-state">
+    <p>{{ error }}</p>
+    <a routerLink="/tickets" class="btn btn-secondary" style="margin-top:12px">Voltar</a>
+  </div>
+} @else if (!ticket) {
+  <div class="card empty-state">
+    <p>Chamado nao encontrado.</p>
     <a routerLink="/tickets" class="btn btn-secondary" style="margin-top:12px">Voltar</a>
   </div>
 } @else {
@@ -15,15 +24,19 @@
     </div>
   </div>
 
+  @if (error) {
+    <div class="alert-error">{{ error }}</div>
+  }
+
   <div class="detail-grid">
     <div class="main-col">
       <div class="card">
-        <h3 class="section-label">Descrição</h3>
+        <h3 class="section-label">Descricao</h3>
         <p class="description">{{ ticket.description }}</p>
       </div>
 
       <div class="card" style="margin-top:16px">
-        <h3 class="section-label">Comentários ({{ comments.length }})</h3>
+        <h3 class="section-label">Comentarios ({{ comments.length }})</h3>
 
         <div class="comments-list">
           @for (c of comments; track c.id) {
@@ -42,12 +55,12 @@
             </div>
           }
           @if (comments.length === 0) {
-            <p style="color:#94a3b8;font-size:13px;padding:8px 0">Nenhum comentário ainda.</p>
+            <p style="color:#94a3b8;font-size:13px;padding:8px 0">Nenhum comentario ainda.</p>
           }
         </div>
 
         <div class="comment-form">
-          <textarea class="form-control" rows="3" placeholder="Adicionar comentário..." [(ngModel)]="newComment"></textarea>
+          <textarea class="form-control" rows="3" placeholder="Adicionar comentario..." [(ngModel)]="newComment"></textarea>
           <button class="btn btn-primary" style="margin-top:8px" (click)="submitComment()" [disabled]="!newComment.trim()">
             Comentar
           </button>
@@ -76,9 +89,17 @@
 
         <div class="detail-item">
           <span class="detail-key">Prioridade</span>
-          <span class="badge" [style.color]="priority[ticket.priority].color" [style.background]="priority[ticket.priority].bg">
-            {{ priority[ticket.priority].label }}
-          </span>
+          @if (canManage) {
+            <select class="form-control" [value]="ticket.priority" (change)="changePriority(+($any($event.target).value))">
+              @for (k of priorityKeys; track k) {
+                <option [value]="k">{{ priority[k].label }}</option>
+              }
+            </select>
+          } @else {
+            <span class="badge" [style.color]="priority[ticket.priority].color" [style.background]="priority[ticket.priority].bg">
+              {{ priority[ticket.priority].label }}
+            </span>
+          }
         </div>
 
         <div class="detail-item">
@@ -87,16 +108,16 @@
         </div>
 
         <div class="detail-item">
-          <span class="detail-key">Responsável</span>
+          <span class="detail-key">Responsavel</span>
           @if (canManage) {
             <select class="form-control" [value]="ticket.assignedTo?.id ?? ''" (change)="assignTechnician($any($event.target).value)">
-              <option value="">Não atribuído</option>
+              <option value="">Selecione um tecnico</option>
               @for (t of technicians; track t.id) {
                 <option [value]="t.id">{{ t.name }}</option>
               }
             </select>
           } @else {
-            <span class="detail-val">{{ ticket.assignedTo?.name ?? '—' }}</span>
+            <span class="detail-val">{{ ticket.assignedTo?.name ?? '-' }}</span>
           }
         </div>
 
@@ -114,6 +135,14 @@
           <div class="detail-item">
             <span class="detail-key">Fechado em</span>
             <span class="detail-val">{{ formatDate(ticket.closedAt) }}</span>
+          </div>
+        }
+
+        @if (canDelete) {
+          <div style="margin-top:16px">
+            <button class="btn btn-danger" type="button" (click)="deleteTicket()" [disabled]="deleting">
+              {{ deleting ? 'Excluindo...' : 'Excluir chamado' }}
+            </button>
           </div>
         }
       </div>
