@@ -378,6 +378,69 @@ class TicketServiceTest {
         verify(auditService).record(eq(technician), eq("TICKET_STATUS_UPDATED"), any(), eq(10L), any(), any());
     }
 
+    @Test
+    void updateTicket_assigningTechnicianMovesOpenTicketToInProgress() {
+        TicketUpdateRequest request = new TicketUpdateRequest(null, null, 2L);
+        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(technician));
+        when(ticketRepository.saveAndFlush(ticket)).thenReturn(ticket);
+
+        TicketResponse result = ticketService.updateTicket(10L, admin, request);
+
+        assertThat(result.status()).isEqualTo(TicketStatus.IN_PROGRESS.getCode());
+        assertThat(result.assignedTo().id()).isEqualTo(2L);
+        verify(auditService).record(eq(admin), eq("TICKET_ASSIGNED"), any(), eq(10L), any(), any());
+        verify(auditService).record(eq(admin), eq("TICKET_STATUS_UPDATED"), any(), eq(10L), any(), any());
+    }
+
+    @Test
+    void updateTicket_assigningKeepsStatusWhenTicketIsNotOpen() {
+        ticket.setStatus(TicketStatus.RESOLVED.getCode());
+        TicketUpdateRequest request = new TicketUpdateRequest(null, null, 2L);
+        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(technician));
+        when(ticketRepository.saveAndFlush(ticket)).thenReturn(ticket);
+
+        TicketResponse result = ticketService.updateTicket(10L, admin, request);
+
+        assertThat(result.status()).isEqualTo(TicketStatus.RESOLVED.getCode());
+    }
+
+    @Test
+    void updateTicket_rejectsAssigningUserThatIsNotTechnician() {
+        TicketUpdateRequest request = new TicketUpdateRequest(null, null, 3L);
+        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+
+        assertThatThrownBy(() -> ticketService.updateTicket(10L, admin, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Technician");
+
+        verify(ticketRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTicket_closingSetsClosedAtAndReopeningClearsIt() {
+        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
+        when(ticketRepository.saveAndFlush(ticket)).thenReturn(ticket);
+
+        TicketResponse closed = ticketService.updateTicket(10L, technician, new TicketUpdateRequest(TicketStatus.CLOSED.getCode(), null, null));
+        assertThat(closed.closedAt()).isNotNull();
+
+        TicketResponse reopened = ticketService.updateTicket(10L, technician, new TicketUpdateRequest(TicketStatus.OPEN.getCode(), null, null));
+        assertThat(reopened.closedAt()).isNull();
+    }
+
+    @Test
+    void updateTicket_doesNotRecordAuditWhenNothingChanges() {
+        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
+        when(ticketRepository.saveAndFlush(ticket)).thenReturn(ticket);
+
+        ticketService.updateTicket(10L, technician, new TicketUpdateRequest(null, ticket.getPriority(), null));
+
+        verify(auditService, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
     // --- listComments ---
 
     @Test

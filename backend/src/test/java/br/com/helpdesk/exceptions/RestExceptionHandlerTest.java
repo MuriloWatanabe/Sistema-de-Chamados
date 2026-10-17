@@ -4,7 +4,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -135,6 +139,37 @@ class RestExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().status()).isEqualTo(500);
         assertThat(response.getBody().message()).isEqualTo("Unexpected error.");
+    }
+
+    @Test
+    void handleAccessDenied_returns403() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleAccessDenied(new AccessDeniedException("Access Denied"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(403);
+    }
+
+    @Test
+    void handleMethodNotAllowed_returns405() {
+        HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("PUT");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotAllowed(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(405);
+    }
+
+    @Test
+    void handleMalformedRequest_returns400WithoutParserDetails() {
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException("JSON parse error: Unexpected end-of-input", new MockHttpInputMessage(new byte[0]));
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleMalformedRequest(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().message()).isEqualTo("Malformed request.");
     }
 
     @Test

@@ -3,6 +3,7 @@ package br.com.helpdesk.services;
 import br.com.helpdesk.dtos.ChangePasswordRequest;
 import br.com.helpdesk.dtos.LoginRequest;
 import br.com.helpdesk.dtos.LoginResponse;
+import br.com.helpdesk.dtos.UserResponse;
 import br.com.helpdesk.entities.User;
 import br.com.helpdesk.exceptions.BusinessRuleException;
 import br.com.helpdesk.exceptions.InvalidCredentialsException;
@@ -64,6 +65,18 @@ class AuthServiceTest {
         user.setActive(true);
 
         loginRequest = new LoginRequest("joao@helpdesk.com", "senha123");
+    }
+
+    @Test
+    void describe_mapsUserWithoutExposingPassword() {
+        UserResponse result = authService.describe(user);
+
+        assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.email()).isEqualTo("joao@helpdesk.com");
+        assertThat(result.role()).isEqualTo(3);
+        assertThat(UserResponse.class.getRecordComponents())
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .doesNotContain("password");
     }
 
     @Test
