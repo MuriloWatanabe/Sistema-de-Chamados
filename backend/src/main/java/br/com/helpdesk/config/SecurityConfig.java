@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -36,19 +37,30 @@ public class SecurityConfig {
             ObjectMapper objectMapper
     ) throws Exception {
         http
+                // API stateless com Bearer token (sem cookies de sessao), por isso CSRF nao se aplica.
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) ->
-                                writeError(response, objectMapper, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", authException.getMessage(), request.getRequestURI()))
+                                writeError(response, objectMapper, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", "Authentication required.", request.getRequestURI()))
                         .accessDeniedHandler((request, response, accessDeniedException) ->
-                                writeError(response, objectMapper, HttpServletResponse.SC_FORBIDDEN, "Forbidden", accessDeniedException.getMessage(), request.getRequestURI()))
+                                writeError(response, objectMapper, HttpServletResponse.SC_FORBIDDEN, "Forbidden", "You do not have permission to perform this operation.", request.getRequestURI()))
                 )
                 .addFilterBefore(tokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -57,7 +69,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
@@ -65,14 +77,20 @@ public class SecurityConfig {
             @Value("${app.cors.allowed-origins:http://localhost:4200}") String allowedOrigins
     ) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        if (origins.contains("*")) {
+            throw new IllegalStateException("app.cors.allowed-origins must list explicit origins, '*' is not allowed.");
+        }
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
-        configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Retry-After"));
+        // O token vai no header Authorization, nao em cookie: nao ha motivo para liberar credenciais cross-origin.
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

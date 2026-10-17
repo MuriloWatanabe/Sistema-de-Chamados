@@ -5,6 +5,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { HelpdeskApiService } from '../../../core/services/helpdesk-api.service';
 import { User, ROLES } from '../../../core/models/user.model';
 
+// Mesma regra do backend (PasswordPolicy): 8 a 72 caracteres, sem espacos, com letras e numeros.
+const PASSWORD_POLICY = /^(?=.*[A-Za-z])(?=.*\d)\S{8,72}$/;
+
 @Component({
   selector: 'app-user-list',
   standalone: true,
@@ -67,8 +70,9 @@ export class UserListComponent implements OnInit {
       return;
     }
 
-    if (this.form.password.trim() && this.form.password.trim().length < 8) {
-      this.formError = 'A senha deve ter pelo menos 8 caracteres.';
+    const password = this.form.password.trim();
+    if (password && !PASSWORD_POLICY.test(password)) {
+      this.formError = 'A senha deve ter de 8 a 72 caracteres, sem espacos, com letras e numeros.';
       return;
     }
 
@@ -102,6 +106,25 @@ export class UserListComponent implements OnInit {
     } catch (error) {
       this.formError = error instanceof Error ? error.message : 'Nao foi possivel excluir o usuario.';
     }
+  }
+
+  isSelf(user: User) {
+    return this.auth.currentUser?.id === user.id;
+  }
+
+  isEditingSelf() {
+    const editing = this.editingUser();
+    return editing !== null && this.isSelf(editing);
+  }
+
+  // Espelha as regras do backend: supervisor nao edita administradores.
+  canEdit(user: User) {
+    return this.auth.isAdmin() || (this.auth.isSupervisorOrAbove() && user.role !== 0);
+  }
+
+  // Somente o administrador altera perfis, e nunca o proprio.
+  canChangeRole() {
+    return this.auth.isAdmin() && !this.isEditingSelf();
   }
 
   getInitials(name: string) {

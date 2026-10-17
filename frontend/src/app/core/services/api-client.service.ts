@@ -45,6 +45,9 @@ export class ApiClientService {
     });
 
     const text = await response.text();
+    if (response.status === 401) {
+      this.auth.handleUnauthorized();
+    }
     if (!response.ok) {
       throw new Error(this.extractErrorMessage(text, response.status));
     }

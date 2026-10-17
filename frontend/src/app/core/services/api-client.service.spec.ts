@@ -7,7 +7,7 @@ describe('ApiClientService', () => {
   let authSpy: jasmine.SpyObj<AuthService>;
 
   beforeEach(() => {
-    authSpy = jasmine.createSpyObj('AuthService', ['authHeaders']);
+    authSpy = jasmine.createSpyObj('AuthService', ['authHeaders', 'handleUnauthorized']);
     authSpy.authHeaders.and.returnValue({ Authorization: 'Bearer test-token' });
 
     TestBed.configureTestingModule({
@@ -128,6 +128,20 @@ describe('ApiClientService', () => {
     mockFetch('', 401);
 
     await expectAsync(service.get('/tickets')).toBeRejectedWithError('Sessao expirada.');
+  });
+
+  it('deve encerrar a sessao local quando a API responde 401', async () => {
+    mockFetch('', 401);
+
+    await expectAsync(service.get('/tickets')).toBeRejected();
+    expect(authSpy.handleUnauthorized).toHaveBeenCalled();
+  });
+
+  it('nao deve encerrar a sessao para erros diferentes de 401', async () => {
+    mockFetch('{"message":"Sem permissao"}', 403);
+
+    await expectAsync(service.get('/users')).toBeRejected();
+    expect(authSpy.handleUnauthorized).not.toHaveBeenCalled();
   });
 
   it('deve usar mensagem generica quando corpo do erro nao e JSON', async () => {

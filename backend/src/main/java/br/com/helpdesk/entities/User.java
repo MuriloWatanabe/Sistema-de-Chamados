@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -48,4 +49,13 @@ public class User {
 
     @Column(name = "ROLE", nullable = false)
     private Integer role;
+
+    // Incrementado em logout, troca de senha, perfil ou desativacao: invalida todos os tokens ja emitidos.
+    @ColumnDefault("0")
+    @Column(name = "TOKEN_VERSION", nullable = false)
+    private Integer tokenVersion = 0;
+
+    public void revokeTokens() {
+        tokenVersion = (tokenVersion == null ? 0 : tokenVersion) + 1;
+    }
 }

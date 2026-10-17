@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 class JwtServiceTest {
 
     private static final String SECRET = "test-secret-for-unit-tests-only!!";
@@ -129,7 +132,7 @@ class JwtServiceTest {
 
     @Test
     void validateAndParse_throwsInvalidTokenExceptionForTokenSignedWithDifferentSecret() {
-        JwtService otherJwtService = new JwtService(new ObjectMapper(), "completely-different-secret!!", EXPIRATION_MINUTES);
+        JwtService otherJwtService = new JwtService(new ObjectMapper(), "completely-different-secret-with-32-bytes!!", EXPIRATION_MINUTES);
         String tokenFromOther = otherJwtService.generateToken(user);
 
         assertThatThrownBy(() -> jwtService.validateAndParse(tokenFromOther))
@@ -152,5 +155,65 @@ class JwtServiceTest {
         JwtService.TokenClaims claims = jwtService.validateAndParse(token);
 
         assertThat(claims.expiresAt()).isGreaterThan(claims.issuedAt());
+    }
+
+    // --- endurecimento do token ---
+
+    @Test
+    void constructor_rejectsSecretShorterThan32Bytes() {
+        assertThatThrownBy(() -> new JwtService(new ObjectMapper(), "short-secret", EXPIRATION_MINUTES))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("32");
+    }
+
+    @Test
+    void generateToken_includesUniqueTokenIdAndVersion() {
+        user.setTokenVersion(3);
+
+        JwtService.TokenClaims first = jwtService.validateAndParse(jwtService.generateToken(user));
+        JwtService.TokenClaims second = jwtService.validateAndParse(jwtService.generateToken(user));
+
+        assertThat(first.tokenVersion()).isEqualTo(3);
+        assertThat(first.tokenId()).isNotBlank().isNotEqualTo(second.tokenId());
+    }
+
+    @Test
+    void validateAndParse_rejectsTokenFromAnotherIssuer() {
+        JwtService otherIssuer = new JwtService(new ObjectMapper(), SECRET, EXPIRATION_MINUTES, "other-api");
+        String token = otherIssuer.generateToken(user);
+
+        assertThatThrownBy(() -> jwtService.validateAndParse(token))
+                .isInstanceOf(JwtService.InvalidTokenException.class)
+                .hasMessageContaining("issuer");
+    }
+
+    @Test
+    void validateAndParse_rejectsAlgNoneToken() {
+        String token = jwtService.generateToken(user);
+        String[] parts = token.split("\\.");
+        String noneHeader = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"none\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> jwtService.validateAndParse(noneHeader + "." + parts[1] + "."))
+                .isInstanceOf(JwtService.InvalidTokenException.class);
+    }
+
+    @Test
+    void validateAndParse_rejectsTamperedPayload() {
+        String token = jwtService.generateToken(user);
+        String[] parts = token.split("\\.");
+        String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8)
+                .replace("\"role\":2", "\"role\":0");
+        String tamperedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> jwtService.validateAndParse(parts[0] + "." + tamperedPayload + "." + parts[2]))
+                .isInstanceOf(JwtService.InvalidTokenException.class)
+                .hasMessageContaining("signature");
+    }
+
+    @Test
+    void validateAndParse_rejectsNullToken() {
+        assertThatThrownBy(() -> jwtService.validateAndParse(null))
+                .isInstanceOf(JwtService.InvalidTokenException.class);
     }
 }

@@ -43,6 +43,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                             if (claims.role() != currentRole) {
                                 throw new JwtService.InvalidTokenException("Token role mismatch");
                             }
+                            int currentVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+                            if (claims.tokenVersion() != currentVersion) {
+                                throw new JwtService.InvalidTokenException("Token revoked");
+                            }
                             AuthenticatedUser principal = new AuthenticatedUser(
                                     user.getId(),
                                     user.getName(),

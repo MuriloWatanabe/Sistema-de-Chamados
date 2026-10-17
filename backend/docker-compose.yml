@@ -29,6 +29,8 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SERVER_PORT: 8080
+      # Troque em producao (minimo 32 caracteres).
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-helpdesk-dev-secret-change-me-before-deploying}
     ports:
       - "8080:8080"
 

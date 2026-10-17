@@ -126,7 +126,7 @@ class RestExceptionHandlerTest {
     }
 
     @Test
-    void handleGeneric_returns500WithExceptionMessage() {
+    void handleGeneric_returns500WithoutLeakingExceptionMessage() {
         Exception ex = new Exception("Erro interno inesperado.");
 
         ResponseEntity<ApiErrorResponse> response = handler.handleGeneric(ex, request);
@@ -134,7 +134,7 @@ class RestExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().status()).isEqualTo(500);
-        assertThat(response.getBody().message()).isEqualTo("Unexpected error: Erro interno inesperado.");
+        assertThat(response.getBody().message()).isEqualTo("Unexpected error.");
     }
 
     @Test
