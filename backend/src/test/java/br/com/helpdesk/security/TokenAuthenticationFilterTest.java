@@ -57,7 +57,7 @@ class TokenAuthenticationFilterTest {
         activeUser.setRole(UserRole.TECHNICIAN.getCode());
         activeUser.setActive(true);
 
-        claims = new JwtService.TokenClaims(1L, "João Silva", "joao@helpdesk.com", UserRole.TECHNICIAN, 1000L, 9999999999L);
+        claims = new JwtService.TokenClaims(1L, "João Silva", "joao@helpdesk.com", UserRole.TECHNICIAN, 1000L, 9999999999L, 0, "token-id");
 
         SecurityContextHolder.clearContext();
     }
@@ -193,5 +193,18 @@ class TokenAuthenticationFilterTest {
         assertThat(authentication.getAuthorities())
                 .extracting("authority")
                 .containsExactly("ROLE_TECHNICIAN");
+    }
+
+    @Test
+    void doFilterInternal_rejectsRevokedTokenAfterLogoutOrPasswordChange() throws Exception {
+        activeUser.setTokenVersion(1);
+        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer valid-token");
+        when(jwtService.validateAndParse("valid-token")).thenReturn(claims);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain).doFilter(request, response);
     }
 }

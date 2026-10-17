@@ -164,7 +164,17 @@ describe('UserListComponent', () => {
 
     await component.saveUser();
 
-    expect(component.formError).toBe('A senha deve ter pelo menos 8 caracteres.');
+    expect(component.formError).toBe('A senha deve ter de 8 a 72 caracteres, sem espacos, com letras e numeros.');
+  });
+
+  it('saveUser deve exigir letras e numeros na senha', async () => {
+    component.editingUser.set(makeUser(1, 'Existente'));
+    component.form = { name: 'Existente', email: 'e@test.com', password: 'somenteletras', role: 3, active: true };
+
+    await component.saveUser();
+
+    expect(component.formError).toContain('letras e numeros');
+    expect(apiSpy.updateUser).not.toHaveBeenCalled();
   });
 
   it('saveUser deve chamar createUser quando nao ha usuario em edicao', async () => {

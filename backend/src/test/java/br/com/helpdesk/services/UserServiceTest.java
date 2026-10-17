@@ -5,6 +5,7 @@ import br.com.helpdesk.dtos.UserUpsertRequest;
 import br.com.helpdesk.entities.User;
 import br.com.helpdesk.enums.UserRole;
 import br.com.helpdesk.exceptions.BusinessRuleException;
+import br.com.helpdesk.exceptions.ForbiddenOperationException;
 import br.com.helpdesk.exceptions.ResourceNotFoundException;
 import br.com.helpdesk.repositories.AuditRepository;
 import br.com.helpdesk.repositories.CommentRepository;
@@ -197,27 +198,19 @@ class UserServiceTest {
     }
 
     @Test
-    void createUser_usesDefaultPasswordWhenNotProvided() {
+    void createUser_requiresPassword() {
         UserUpsertRequest request = new UserUpsertRequest("New User", "new@helpdesk.com", null, UserRole.REQUESTER.getCode(), true);
-        when(userRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
-        when(passwordEncoder.encode("Helpdesk@123")).thenReturn("encoded_default");
-        User saved = new User();
-        saved.setId(10L);
-        saved.setName("New User");
-        saved.setEmail("new@helpdesk.com");
-        saved.setRole(UserRole.REQUESTER.getCode());
-        saved.setActive(true);
-        saved.setPassword("encoded_default");
-        when(userRepository.saveAndFlush(any(User.class))).thenReturn(saved);
 
-        userService.createUser(request, admin);
+        assertThatThrownBy(() -> userService.createUser(request, admin))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Password is required");
 
-        verify(passwordEncoder).encode("Helpdesk@123");
+        verify(userRepository, never()).saveAndFlush(any());
     }
 
     @Test
     void createUser_throwsBusinessRuleWhenEmailAlreadyExists() {
-        UserUpsertRequest request = new UserUpsertRequest("New User", "admin@helpdesk.com", null, UserRole.REQUESTER.getCode(), true);
+        UserUpsertRequest request = new UserUpsertRequest("New User", "admin@helpdesk.com", "Pass1234", UserRole.REQUESTER.getCode(), true);
         when(userRepository.existsByEmailIgnoreCase("admin@helpdesk.com")).thenReturn(true);
 
         assertThatThrownBy(() -> userService.createUser(request, admin))
@@ -395,5 +388,121 @@ class UserServiceTest {
         userService.deleteUser(3L, admin);
 
         verify(auditService).record(eq(admin), eq("USER_DELETED"), any(), eq(3L), any(), eq(null));
+    }
+
+    // --- regras de permissao (Plano de Controle) ---
+
+    private User supervisor() {
+        User supervisor = new User();
+        supervisor.setId(4L);
+        supervisor.setName("Supervisor User");
+        supervisor.setEmail("supervisor@helpdesk.com");
+        supervisor.setPassword("hashed");
+        supervisor.setRole(UserRole.SUPERVISOR.getCode());
+        supervisor.setActive(true);
+        return supervisor;
+    }
+
+    @Test
+    void updateUser_supervisorCannotEditAdministrator() {
+        UserUpsertRequest request = new UserUpsertRequest("Admin", "admin@helpdesk.com", null, UserRole.ADMIN.getCode(), true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> userService.updateUser(1L, request, supervisor()))
+                .isInstanceOf(ForbiddenOperationException.class);
+
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateUser_supervisorCannotChangeRoles() {
+        UserUpsertRequest request = new UserUpsertRequest("Requester", "requester@helpdesk.com", null, UserRole.ADMIN.getCode(), true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+
+        assertThatThrownBy(() -> userService.updateUser(3L, request, supervisor()))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("roles");
+
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateUser_supervisorCanEditDataOfNonAdminUser() {
+        UserUpsertRequest request = new UserUpsertRequest("New Name", "requester@helpdesk.com", null, UserRole.REQUESTER.getCode(), true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+        when(userRepository.existsByEmailIgnoreCaseAndIdNot(anyString(), anyLong())).thenReturn(false);
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(requester);
+
+        UserResponse result = userService.updateUser(3L, request, supervisor());
+
+        assertThat(result.name()).isEqualTo("New Name");
+    }
+
+    @Test
+    void updateUser_userCannotChangeOwnRole() {
+        UserUpsertRequest request = new UserUpsertRequest("Admin", "admin@helpdesk.com", null, UserRole.REQUESTER.getCode(), true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> userService.updateUser(1L, request, admin))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("own role");
+    }
+
+    @Test
+    void updateUser_userCannotDeactivateThemselves() {
+        UserUpsertRequest request = new UserUpsertRequest("Admin", "admin@helpdesk.com", null, UserRole.ADMIN.getCode(), false);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> userService.updateUser(1L, request, admin))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("deactivate");
+    }
+
+    @Test
+    void updateUser_roleChangeRevokesTokensAndIsAudited() {
+        UserUpsertRequest request = new UserUpsertRequest("Requester", "requester@helpdesk.com", null, UserRole.TECHNICIAN.getCode(), true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+        when(userRepository.existsByEmailIgnoreCaseAndIdNot(anyString(), anyLong())).thenReturn(false);
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(requester);
+
+        userService.updateUser(3L, request, admin);
+
+        assertThat(requester.getTokenVersion()).isEqualTo(1);
+        verify(auditService).record(eq(admin), eq("USER_ROLE_CHANGED"), any(), eq(3L), any(), any());
+    }
+
+    @Test
+    void updateUser_passwordChangeRevokesTokens() {
+        UserUpsertRequest request = new UserUpsertRequest("Requester", "requester@helpdesk.com", "NewPass1", UserRole.REQUESTER.getCode(), true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+        when(userRepository.existsByEmailIgnoreCaseAndIdNot(anyString(), anyLong())).thenReturn(false);
+        when(passwordEncoder.encode("NewPass1")).thenReturn("new_encoded");
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(requester);
+
+        userService.updateUser(3L, request, admin);
+
+        assertThat(requester.getTokenVersion()).isEqualTo(1);
+        verify(auditService).record(eq(admin), eq("USER_PASSWORD_CHANGED"), any(), eq(3L), eq(null), eq(null));
+    }
+
+    @Test
+    void updateUser_plainDataChangeKeepsTokensValid() {
+        UserUpsertRequest request = new UserUpsertRequest("Other Name", "requester@helpdesk.com", null, UserRole.REQUESTER.getCode(), true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
+        when(userRepository.existsByEmailIgnoreCaseAndIdNot(anyString(), anyLong())).thenReturn(false);
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(requester);
+
+        userService.updateUser(3L, request, admin);
+
+        assertThat(requester.getTokenVersion()).isZero();
+    }
+
+    @Test
+    void deleteUser_userCannotDeleteThemselves() {
+        assertThatThrownBy(() -> userService.deleteUser(1L, admin))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("own user");
+
+        verify(userRepository, never()).delete(any());
     }
 }

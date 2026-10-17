@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 public record TicketCreateRequest(
         @NotBlank @Size(max = 200) String title,
-        @NotBlank String description,
+        @NotBlank @Size(max = 5000) String description,
         @NotNull Integer priority,
         Long requesterId,
         Long assignedToId

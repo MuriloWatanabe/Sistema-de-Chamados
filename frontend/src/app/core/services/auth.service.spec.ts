@@ -13,6 +13,13 @@ const mockUser: User = {
   updatedAt: '2024-01-01T00:00:00',
 };
 
+function fakeJwt(expSecondsFromNow: number): string {
+  const encode = (value: object) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const exp = Math.floor(Date.now() / 1000) + expSecondsFromNow;
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ uid: 1, exp })}.assinatura`;
+}
+
 describe('AuthService', () => {
   let service: AuthService;
   let routerSpy: jasmine.SpyObj<Router>;
@@ -165,5 +172,57 @@ describe('AuthService', () => {
     const result = await service.login('user@email.com', 'pass');
 
     expect(result).toBeFalse();
+  });
+
+  // --- expiracao e revogacao do token ---
+
+  it('deve considerar logado quando o token ainda nao expirou', async () => {
+    spyOn(globalThis, 'fetch').and.returnValue(
+      Promise.resolve(new Response(JSON.stringify({ user: mockUser, token: fakeJwt(3600) }), { status: 200 }))
+    );
+
+    await service.login('joao@helpdesk.com', 'senha123');
+
+    expect(service.isLoggedIn()).toBeTrue();
+  });
+
+  it('deve considerar deslogado quando o token expirou', () => {
+    localStorage.setItem('hd_token', fakeJwt(-60));
+    (service as any)._currentUser.set(mockUser);
+
+    expect(service.isLoggedIn()).toBeFalse();
+  });
+
+  it('nao deve restaurar sessao salva com token expirado', () => {
+    localStorage.setItem('hd_user', JSON.stringify(mockUser));
+    localStorage.setItem('hd_token', fakeJwt(-60));
+
+    const restored = new AuthService(routerSpy);
+
+    expect(restored.currentUser).toBeNull();
+    expect(localStorage.getItem('hd_token')).toBeNull();
+  });
+
+  it('deve revogar o token no backend ao fazer logout', () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response(null, { status: 204 })));
+    localStorage.setItem('hd_token', 'token-atual');
+
+    service.logout();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:8080/api/auth/logout',
+      jasmine.objectContaining({ method: 'POST', headers: { Authorization: 'Bearer token-atual' } })
+    );
+  });
+
+  it('deve limpar a sessao e ir para /login quando a API responde 401', () => {
+    localStorage.setItem('hd_token', 'abc');
+    localStorage.setItem('hd_user', JSON.stringify(mockUser));
+
+    service.handleUnauthorized();
+
+    expect(localStorage.getItem('hd_token')).toBeNull();
+    expect(service.currentUser).toBeNull();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/login']);
   });
 });

@@ -81,14 +81,27 @@ Request -> TokenAuthenticationFilter -> SecurityContext -> Controller -> Service
 - A coluna `PASSWORD` em `USERS` guarda somente hash bcrypt; a senha nunca fica em texto puro.
 - O login so aceita usuario ativo e compara a senha com `passwordEncoder.matches(...)`.
 - Ao criar ou atualizar usuario, o backend chama `passwordEncoder.encode(...)` antes de salvar.
-- O JWT e assinado com HMAC SHA-256 usando `app.security.jwt.secret`.
-- O token carrega `uid`, `name`, `email`, `role`, `iat` e `exp`, e expira por padrao em 120 minutos.
-- Em cada request, `TokenAuthenticationFilter` valida assinatura, expiracao, usuario ativo e papel antes de montar o `SecurityContext`.
+- O JWT e assinado com HMAC SHA-256 usando `app.security.jwt.secret`, que precisa ter no minimo 32 bytes (a aplicacao nao sobe com segredo curto).
+- O token carrega `iss`, `sub`, `jti`, `uid`, `name`, `email`, `role`, `ver`, `iat` e `exp`, e expira por padrao em 120 minutos.
+- Na validacao, o backend confere assinatura (comparacao em tempo constante), algoritmo `HS256` no header, emissor (`iss`), expiracao e `iat` no futuro.
+- Em cada request, `TokenAuthenticationFilter` tambem confere se o usuario esta ativo, se o papel ainda e o mesmo e se a versao do token (`ver`) bate com `USERS.TOKEN_VERSION`.
+- Revogacao de tokens: `TOKEN_VERSION` e incrementado no logout, na troca de senha, na mudanca de perfil e na desativacao do usuario. Todos os tokens emitidos antes deixam de valer.
+- Politica de senhas (Plano de Controle 3.2): 8 a 72 caracteres, sem espacos, com letras e numeros. Validada no backend (`PasswordPolicy`) e espelhada na tela de usuarios.
+- Protecao contra forca bruta: apos 5 falhas seguidas para o mesmo e-mail, o login fica bloqueado por 15 minutos (`429 Too Many Requests` com header `Retry-After`).
+- O login roda o BCrypt mesmo quando o e-mail nao existe, para o tempo de resposta nao revelar quais contas existem. A mensagem de erro e sempre a mesma.
+- Tentativas de login invalidas, logout e troca de senha sao gravadas na auditoria (`AUTH_LOGIN_FAILED`, `AUTH_LOGOUT`, `AUTH_PASSWORD_CHANGED`).
 - O backend libera apenas:
   - `POST /api/auth/login`
   - `GET /api/health`
 - O restante da API exige autenticacao.
-- O acesso por papel usa `@PreAuthorize`.
+- O acesso por papel usa `@PreAuthorize`, e os services reforcam as regras:
+  - somente ADMIN cria usuarios e altera perfis (permissoes);
+  - SUPERVISOR edita dados de usuarios, mas nao edita administradores nem altera perfis;
+  - ninguem altera o proprio perfil, se desativa ou se exclui.
+- Erros: `403` para acesso negado (inclusive vindo do `@PreAuthorize`), `400` para JSON malformado e codigos de enum invalidos, `429` para login bloqueado. Erros `500` nao expoem detalhes internos ao cliente; o detalhe fica so no log.
+- Cabecalhos de seguranca: `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e HSTS (em HTTPS).
+- CORS aceita apenas as origens listadas em `APP_CORS_ALLOWED_ORIGINS` (`*` e recusado) e nao libera credenciais, ja que o token vai no header.
+- Limites de tamanho nas entradas: descricao do chamado ate 5000 caracteres e comentario ate 2000.
 - Os usuarios iniciais tambem sao gravados com hash bcrypt pelo `DataInitializer`.
 
 ### Papais de acesso
@@ -188,6 +201,8 @@ Request -> TokenAuthenticationFilter -> SecurityContext -> Controller -> Service
 |---|---|---|---|
 | POST | `/api/auth/login` | publico | autenticar e gerar JWT |
 | GET | `/api/auth/me` | autenticado | retornar usuario atual |
+| POST | `/api/auth/logout` | autenticado | revogar os tokens do usuario |
+| PUT | `/api/auth/password` | autenticado | trocar a propria senha (retorna um novo token) |
 | GET | `/api/health` | publico | healthcheck |
 | GET | `/api/tickets` | autenticado | listar chamados visiveis |
 | GET | `/api/tickets/{id}` | autenticado | detalhar chamado |
@@ -231,6 +246,9 @@ Variaveis aceitas:
 - `APP_CORS_ALLOWED_ORIGINS`
 - `APP_SECURITY_JWT_SECRET`
 - `APP_SECURITY_JWT_EXPIRATION_MINUTES`
+- `APP_SECURITY_JWT_ISSUER`
+- `APP_SECURITY_LOGIN_MAX_ATTEMPTS`
+- `APP_SECURITY_LOGIN_LOCK_MINUTES`
 - `SERVER_PORT`
 
 Defaults atuais:
@@ -240,6 +258,7 @@ Defaults atuais:
 - senha: `postgres`
 - porta: `8080`
 - CORS: `http://localhost:4200,http://127.0.0.1:4200`
+- segredo JWT: um valor de desenvolvimento. **Em producao, defina `APP_SECURITY_JWT_SECRET`** com pelo menos 32 caracteres aleatorios.
 
 ---
 
@@ -281,6 +300,10 @@ Defaults atuais:
   - tenta login real no backend
   - valida a sessao salva com `/api/auth/me`
   - guarda o usuario no `localStorage`
+  - le o `exp` do token: nao restaura sessao expirada e encerra a sessao automaticamente quando o token vence
+  - no logout, chama `POST /api/auth/logout` para revogar o token no servidor
+- `ApiClientService`
+  - em qualquer resposta `401`, limpa a sessao e volta para `/login`
 - `authGuard`
   - libera rotas apenas se existir usuario logado
 - `MainLayoutComponent`

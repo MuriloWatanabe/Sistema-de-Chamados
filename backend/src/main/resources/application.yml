@@ -1,6 +1,9 @@
 spring:
   application:
     name: helpdesk
+  autoconfigure:
+    # A autenticacao e feita por JWT; evita o usuario "user" com senha gerada do Spring Boot.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/helpdesk}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -22,8 +25,18 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
   security:
     jwt:
-      secret: ${APP_SECURITY_JWT_SECRET:helpdesk-dev-secret-change-me}
+      # Minimo de 32 bytes. O valor padrao serve so para desenvolvimento: em producao defina APP_SECURITY_JWT_SECRET.
+      secret: ${APP_SECURITY_JWT_SECRET:helpdesk-dev-secret-change-me-before-deploying}
       expiration-minutes: ${APP_SECURITY_JWT_EXPIRATION_MINUTES:120}
+      issuer: ${APP_SECURITY_JWT_ISSUER:helpdesk-api}
+    login:
+      max-attempts: ${APP_SECURITY_LOGIN_MAX_ATTEMPTS:5}
+      lock-minutes: ${APP_SECURITY_LOGIN_LOCK_MINUTES:15}
 
 server:
   port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+    include-binding-errors: never
