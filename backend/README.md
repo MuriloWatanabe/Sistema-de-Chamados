@@ -57,6 +57,18 @@ Enderecos principais:
 - `GET /api/dashboard/stats`
 - `GET /api/audits`
 
+## Documentacao da API (Swagger)
+
+Com o backend no ar:
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI em JSON: `http://localhost:8080/v3/api-docs`
+
+Para testar rotas protegidas, chame `POST /api/auth/login`, copie o `token` da resposta e informe-o em **Authorize**.
+Todas as respostas de erro seguem o schema `ApiErrorResponse`.
+
+Para desativar a documentacao em producao, defina `SPRINGDOC_ENABLED=false`.
+
 ## Banco de dados
 
 Configuracao usada no ambiente Docker:

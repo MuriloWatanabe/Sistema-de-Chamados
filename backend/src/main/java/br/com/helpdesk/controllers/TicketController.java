@@ -7,6 +7,10 @@ import br.com.helpdesk.dtos.TicketResponse;
 import br.com.helpdesk.dtos.TicketUpdateRequest;
 import br.com.helpdesk.services.TicketService;
 import br.com.helpdesk.security.CurrentUserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +29,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tickets")
+@Tag(name = "Tickets", description = "Abertura, acompanhamento e atendimento de chamados")
 public class TicketController {
     private final TicketService ticketService;
     private final CurrentUserService currentUserService;
@@ -36,19 +41,37 @@ public class TicketController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar chamados visiveis",
+            description = "Tecnicos, supervisores e administradores veem todos os chamados; "
+                    + "solicitantes veem apenas os que abriram. Ordenado do mais recente para o mais antigo.")
+    @ApiResponse(responseCode = "200", description = "Lista de chamados")
     public List<TicketResponse> listTickets(Authentication authentication) {
         return ticketService.listVisibleTickets(currentUserService.requireUser(authentication));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public TicketResponse getTicket(@PathVariable Long id, Authentication authentication) {
+    @Operation(summary = "Buscar chamado por ID")
+    @ApiResponse(responseCode = "200", description = "Chamado encontrado")
+    @ApiResponse(responseCode = "403", description = "Solicitante tentando acessar chamado de outro usuario")
+    @ApiResponse(responseCode = "404", description = "Chamado inexistente")
+    public TicketResponse getTicket(
+            @Parameter(description = "ID do chamado", example = "1") @PathVariable Long id,
+            Authentication authentication
+    ) {
         return ticketService.getTicket(id, currentUserService.requireUser(authentication));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Abrir chamado",
+            description = "Cria o chamado com status Aberto, ou Em andamento quando ja e atribuido a um tecnico. "
+                    + "Apenas tecnicos ou perfis superiores podem abrir em nome de outro usuario (requesterId).")
+    @ApiResponse(responseCode = "201", description = "Chamado criado")
+    @ApiResponse(responseCode = "400", description = "Dados invalidos ou responsavel informado nao e tecnico")
+    @ApiResponse(responseCode = "403", description = "Solicitante tentando abrir chamado em nome de outro usuario")
+    @ApiResponse(responseCode = "404", description = "Solicitante ou responsavel inexistente")
     public TicketResponse createTicket(@Valid @RequestBody TicketCreateRequest request, Authentication authentication) {
         return ticketService.createTicket(currentUserService.requireUser(authentication), request);
     }
@@ -56,26 +79,59 @@ public class TicketController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    public void deleteTicket(@PathVariable Long id, Authentication authentication) {
+    @Operation(summary = "Excluir chamado",
+            description = "Remove o chamado e seus comentarios. Somente administradores.")
+    @ApiResponse(responseCode = "204", description = "Chamado excluido")
+    @ApiResponse(responseCode = "404", description = "Chamado inexistente")
+    public void deleteTicket(
+            @Parameter(description = "ID do chamado", example = "1") @PathVariable Long id,
+            Authentication authentication
+    ) {
         ticketService.deleteTicket(id, currentUserService.requireUser(authentication));
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('TECHNICIAN', 'SUPERVISOR', 'ADMIN')")
-    public TicketResponse updateTicket(@PathVariable Long id, @Valid @RequestBody TicketUpdateRequest request, Authentication authentication) {
+    @Operation(summary = "Atualizar status, prioridade ou responsavel",
+            description = "Apenas os campos informados sao alterados. Atribuir um tecnico a um chamado Aberto "
+                    + "o move para Em andamento; mudar o status para Fechado registra a data de encerramento.")
+    @ApiResponse(responseCode = "200", description = "Chamado atualizado")
+    @ApiResponse(responseCode = "400", description = "Codigo invalido ou responsavel informado nao e tecnico")
+    @ApiResponse(responseCode = "404", description = "Chamado ou responsavel inexistente")
+    public TicketResponse updateTicket(
+            @Parameter(description = "ID do chamado", example = "1") @PathVariable Long id,
+            @Valid @RequestBody TicketUpdateRequest request,
+            Authentication authentication
+    ) {
         return ticketService.updateTicket(id, currentUserService.requireUser(authentication), request);
     }
 
     @GetMapping("/{id}/comments")
     @PreAuthorize("isAuthenticated()")
-    public List<CommentResponse> listComments(@PathVariable Long id, Authentication authentication) {
+    @Operation(summary = "Listar comentarios do chamado", description = "Ordenados do mais antigo para o mais recente.")
+    @ApiResponse(responseCode = "200", description = "Lista de comentarios")
+    @ApiResponse(responseCode = "403", description = "Solicitante tentando acessar chamado de outro usuario")
+    @ApiResponse(responseCode = "404", description = "Chamado inexistente")
+    public List<CommentResponse> listComments(
+            @Parameter(description = "ID do chamado", example = "1") @PathVariable Long id,
+            Authentication authentication
+    ) {
         return ticketService.listComments(id, currentUserService.requireUser(authentication));
     }
 
     @PostMapping("/{id}/comments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
-    public CommentResponse addComment(@PathVariable Long id, @Valid @RequestBody CommentCreateRequest request, Authentication authentication) {
+    @Operation(summary = "Adicionar comentario ao chamado")
+    @ApiResponse(responseCode = "201", description = "Comentario criado")
+    @ApiResponse(responseCode = "400", description = "Comentario vazio")
+    @ApiResponse(responseCode = "403", description = "Solicitante tentando comentar chamado de outro usuario")
+    @ApiResponse(responseCode = "404", description = "Chamado inexistente")
+    public CommentResponse addComment(
+            @Parameter(description = "ID do chamado", example = "1") @PathVariable Long id,
+            @Valid @RequestBody CommentCreateRequest request,
+            Authentication authentication
+    ) {
         return ticketService.addComment(id, currentUserService.requireUser(authentication), request);
     }
 }

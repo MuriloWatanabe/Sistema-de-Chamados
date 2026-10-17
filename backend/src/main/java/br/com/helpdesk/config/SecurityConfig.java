@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,7 +32,37 @@ import java.util.stream.Collectors;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+    static final String[] API_DOCS_PATHS = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
+
+    // O Swagger UI carrega JS/CSS proprios e usa estilos inline; a API mantem a politica "default-src 'none'".
+    private static final String API_DOCS_CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
+
+    /** Documentacao OpenAPI: publica, somente leitura e com CSP que permite o Swagger UI funcionar. */
     @Bean
+    @Order(1)
+    public SecurityFilterChain apiDocsSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(API_DOCS_PATHS)
+                .csrf(csrf -> csrf.disable())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(API_DOCS_CSP))
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, API_DOCS_PATHS).permitAll()
+                        .anyRequest().denyAll()
+                );
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             TokenAuthenticationFilter tokenAuthenticationFilter,

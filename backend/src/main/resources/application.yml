@@ -40,3 +40,14 @@ server:
     include-stacktrace: never
     include-exception: false
     include-binding-errors: never
+
+springdoc:
+  # As respostas de erro sao documentadas pelo OpenApiConfig; nao inferir a partir do RestExceptionHandler.
+  override-with-generic-response: false
+  default-produces-media-type: application/json
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:true}
+    operations-sorter: method
+    tags-sorter: alpha
