@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class TicketService {
@@ -56,17 +57,33 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public DashboardStatsResponse getDashboardStats(User actor) {
-        List<Ticket> visibleTickets = visibleTickets(actor);
-        long total = visibleTickets.size();
-        long open = visibleTickets.stream().filter(ticket -> ticket.getStatus() == TicketStatus.OPEN.getCode()).count();
-        long inProgress = visibleTickets.stream().filter(ticket -> ticket.getStatus() == TicketStatus.IN_PROGRESS.getCode()).count();
-        long resolved = visibleTickets.stream().filter(ticket -> ticket.getStatus() == TicketStatus.RESOLVED.getCode()).count();
-        long closed = visibleTickets.stream().filter(ticket -> ticket.getStatus() == TicketStatus.CLOSED.getCode()).count();
-        long urgent = visibleTickets.stream()
-                .filter(ticket -> ticket.getPriority() == TicketPriority.URGENT.getCode())
-                .filter(ticket -> ticket.getStatus() < TicketStatus.CLOSED.getCode())
-                .count();
-        return new DashboardStatsResponse(total, open, inProgress, resolved, closed, urgent);
+        if (actor == null) {
+            throw new ForbiddenOperationException("Authentication required.");
+        }
+        int urgentCode = TicketPriority.URGENT.getCode();
+        int closedCode = TicketStatus.CLOSED.getCode();
+
+        List<TicketRepository.StatusCount> countsByStatus;
+        long urgent;
+        if (canSeeAllTickets(actor)) {
+            countsByStatus = ticketRepository.countGroupedByStatus();
+            urgent = ticketRepository.countByPriorityAndStatusNot(urgentCode, closedCode);
+        } else {
+            countsByStatus = ticketRepository.countGroupedByStatusForRequester(actor.getId());
+            urgent = ticketRepository.countByRequesterIdAndPriorityAndStatusNot(actor.getId(), urgentCode, closedCode);
+        }
+
+        Map<Integer, Long> byStatus = countsByStatus.stream()
+                .collect(Collectors.toMap(TicketRepository.StatusCount::getStatus, TicketRepository.StatusCount::getTotal));
+        long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
+        return new DashboardStatsResponse(
+                total,
+                byStatus.getOrDefault(TicketStatus.OPEN.getCode(), 0L),
+                byStatus.getOrDefault(TicketStatus.IN_PROGRESS.getCode(), 0L),
+                byStatus.getOrDefault(TicketStatus.RESOLVED.getCode(), 0L),
+                byStatus.getOrDefault(closedCode, 0L),
+                urgent
+        );
     }
 
     @Transactional(readOnly = true)
@@ -137,11 +154,8 @@ public class TicketService {
         }
 
         if (request.assignedToId() != null) {
-            User assignedTo = resolveAssignable(request.assignedToId());
-            ticket.setAssignedTo(assignedTo);
-            if (assignedTo == null && ticket.getStatus() != TicketStatus.CLOSED.getCode()) {
-                ticket.setStatus(TicketStatus.OPEN.getCode());
-            } else if (assignedTo != null && ticket.getStatus() == TicketStatus.OPEN.getCode()) {
+            ticket.setAssignedTo(resolveAssignable(request.assignedToId()));
+            if (ticket.getStatus() == TicketStatus.OPEN.getCode()) {
                 ticket.setStatus(TicketStatus.IN_PROGRESS.getCode());
             }
         }
@@ -157,68 +171,6 @@ public class TicketService {
         }
         Long beforeAssignedToId = before.assignedTo() == null ? null : before.assignedTo().id();
         Long afterAssignedToId = after.assignedTo() == null ? null : after.assignedTo().id();
-        if (!Objects.equals(beforeAssignedToId, afterAssignedToId)) {
-            auditService.record(actor, "TICKET_ASSIGNED", AuditEntityType.TICKET, saved.getId(), before, after);
-        }
-
-        return after;
-    }
-
-    @Transactional
-    public TicketResponse updateTicketStatus(Long id, User actor, Integer statusCode) {
-        Ticket ticket = loadTicket(id);
-        assertCanManageTickets(actor);
-        TicketResponse before = DtoMapper.toTicketResponse(ticket);
-
-        TicketStatus status = TicketStatus.fromCode(statusCode);
-        ticket.setStatus(status.getCode());
-        ticket.setClosedAt(status.isClosed() ? LocalDateTime.now() : null);
-        Ticket saved = ticketRepository.saveAndFlush(ticket);
-        TicketResponse after = DtoMapper.toTicketResponse(saved);
-
-        if (!Objects.equals(before.status(), after.status())) {
-            auditService.record(actor, "TICKET_STATUS_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
-        }
-
-        return after;
-    }
-
-    @Transactional
-    public TicketResponse updateTicketPriority(Long id, User actor, Integer priorityCode) {
-        Ticket ticket = loadTicket(id);
-        assertCanManageTickets(actor);
-        TicketResponse before = DtoMapper.toTicketResponse(ticket);
-
-        ticket.setPriority(TicketPriority.fromCode(priorityCode).getCode());
-        Ticket saved = ticketRepository.saveAndFlush(ticket);
-        TicketResponse after = DtoMapper.toTicketResponse(saved);
-
-        if (!Objects.equals(before.priority(), after.priority())) {
-            auditService.record(actor, "TICKET_PRIORITY_UPDATED", AuditEntityType.TICKET, saved.getId(), before, after);
-        }
-
-        return after;
-    }
-
-    @Transactional
-    public TicketResponse assignTicket(Long id, User actor, Long assignedToId) {
-        Ticket ticket = loadTicket(id);
-        assertCanManageTickets(actor);
-        TicketResponse before = DtoMapper.toTicketResponse(ticket);
-
-        User assignedTo = resolveAssignable(assignedToId);
-        ticket.setAssignedTo(assignedTo);
-        if (assignedTo == null && ticket.getStatus() != TicketStatus.CLOSED.getCode()) {
-            ticket.setStatus(TicketStatus.OPEN.getCode());
-        } else if (assignedTo != null && ticket.getStatus() == TicketStatus.OPEN.getCode()) {
-            ticket.setStatus(TicketStatus.IN_PROGRESS.getCode());
-        }
-
-        Ticket saved = ticketRepository.saveAndFlush(ticket);
-        TicketResponse after = DtoMapper.toTicketResponse(saved);
-        Long beforeAssignedToId = before.assignedTo() == null ? null : before.assignedTo().id();
-        Long afterAssignedToId = after.assignedTo() == null ? null : after.assignedTo().id();
-
         if (!Objects.equals(beforeAssignedToId, afterAssignedToId)) {
             auditService.record(actor, "TICKET_ASSIGNED", AuditEntityType.TICKET, saved.getId(), before, after);
         }
@@ -250,19 +202,18 @@ public class TicketService {
         return DtoMapper.toCommentResponse(saved);
     }
 
-    @Transactional(readOnly = true)
-    public List<TicketResponse> listAssignableTickets(User actor) {
-        return listVisibleTickets(actor);
-    }
-
     private List<Ticket> visibleTickets(User actor) {
         if (actor == null) {
             throw new ForbiddenOperationException("Authentication required.");
         }
-        if (UserRole.fromCode(actor.getRole()).hasAccessAtLeast(UserRole.TECHNICIAN)) {
+        if (canSeeAllTickets(actor)) {
             return ticketRepository.findAllByOrderByCreatedAtDesc();
         }
         return ticketRepository.findByRequesterIdOrderByCreatedAtDesc(actor.getId());
+    }
+
+    private boolean canSeeAllTickets(User actor) {
+        return UserRole.fromCode(actor.getRole()).hasAccessAtLeast(UserRole.TECHNICIAN);
     }
 
     private Ticket loadTicket(Long id) {

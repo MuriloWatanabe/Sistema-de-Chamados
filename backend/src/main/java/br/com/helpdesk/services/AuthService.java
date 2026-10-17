@@ -3,6 +3,7 @@ package br.com.helpdesk.services;
 import br.com.helpdesk.dtos.ChangePasswordRequest;
 import br.com.helpdesk.dtos.LoginRequest;
 import br.com.helpdesk.dtos.LoginResponse;
+import br.com.helpdesk.dtos.UserResponse;
 import br.com.helpdesk.entities.User;
 import br.com.helpdesk.enums.AuditEntityType;
 import br.com.helpdesk.exceptions.BusinessRuleException;
@@ -95,6 +96,10 @@ public class AuthService {
         auditService.record(saved, "AUTH_PASSWORD_CHANGED", AuditEntityType.AUTH, saved.getId(), null, null);
         // Os tokens antigos foram revogados; devolve um novo para a sessao atual continuar.
         return new LoginResponse(jwtService.generateToken(saved), "Bearer", DtoMapper.toUserResponse(saved));
+    }
+
+    public UserResponse describe(User user) {
+        return DtoMapper.toUserResponse(user);
     }
 
     private String dummyHash() {

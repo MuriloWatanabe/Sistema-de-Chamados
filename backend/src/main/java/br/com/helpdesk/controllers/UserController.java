@@ -5,6 +5,7 @@ import br.com.helpdesk.dtos.UserUpsertRequest;
 import br.com.helpdesk.services.UserService;
 import br.com.helpdesk.security.CurrentUserService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -48,6 +50,7 @@ public class UserController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse createUser(@Valid @RequestBody UserUpsertRequest request, Authentication authentication) {
         return userService.createUser(request, currentUserService.requireUser(authentication));
@@ -60,6 +63,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteUser(@PathVariable Long id, Authentication authentication) {
         userService.deleteUser(id, currentUserService.requireUser(authentication));

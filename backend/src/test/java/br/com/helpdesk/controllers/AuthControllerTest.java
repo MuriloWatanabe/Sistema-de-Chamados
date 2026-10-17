@@ -76,6 +76,8 @@ class AuthControllerTest {
     void me_returnsCurrentUserMappedToResponse() {
         Authentication authentication = mock(Authentication.class);
         when(currentUserService.requireUser(authentication)).thenReturn(user);
+        when(authService.describe(user)).thenReturn(
+                new UserResponse(1L, "João Silva", "joao@helpdesk.com", true, 1, LocalDateTime.now(), LocalDateTime.now()));
 
         UserResponse result = controller.me(authentication);
 

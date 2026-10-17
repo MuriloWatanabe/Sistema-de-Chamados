@@ -132,27 +132,28 @@ class TicketServiceTest {
 
     @Test
     void getDashboardStats_countsTicketsByStatus() {
-        Ticket open = buildTicket(1L, TicketStatus.OPEN, TicketPriority.LOW);
-        Ticket inProgress = buildTicket(2L, TicketStatus.IN_PROGRESS, TicketPriority.MEDIUM);
-        Ticket resolved = buildTicket(3L, TicketStatus.RESOLVED, TicketPriority.HIGH);
-        Ticket closed = buildTicket(4L, TicketStatus.CLOSED, TicketPriority.LOW);
-        when(ticketRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(open, inProgress, resolved, closed));
+        when(ticketRepository.countGroupedByStatus()).thenReturn(List.of(
+                statusCount(TicketStatus.OPEN, 3),
+                statusCount(TicketStatus.IN_PROGRESS, 2),
+                statusCount(TicketStatus.RESOLVED, 1),
+                statusCount(TicketStatus.CLOSED, 4)
+        ));
 
         DashboardStatsResponse stats = ticketService.getDashboardStats(technician);
 
-        assertThat(stats.total()).isEqualTo(4);
-        assertThat(stats.open()).isEqualTo(1);
-        assertThat(stats.inProgress()).isEqualTo(1);
+        assertThat(stats.total()).isEqualTo(10);
+        assertThat(stats.open()).isEqualTo(3);
+        assertThat(stats.inProgress()).isEqualTo(2);
         assertThat(stats.resolved()).isEqualTo(1);
-        assertThat(stats.closed()).isEqualTo(1);
+        assertThat(stats.closed()).isEqualTo(4);
         assertThat(stats.urgent()).isZero();
     }
 
     @Test
-    void getDashboardStats_countsUrgentOpenTickets() {
-        Ticket urgentOpen = buildTicket(1L, TicketStatus.OPEN, TicketPriority.URGENT);
-        Ticket urgentClosed = buildTicket(2L, TicketStatus.CLOSED, TicketPriority.URGENT);
-        when(ticketRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(urgentOpen, urgentClosed));
+    void getDashboardStats_countsUrgentTicketsThatAreNotClosed() {
+        when(ticketRepository.countGroupedByStatus()).thenReturn(List.of(statusCount(TicketStatus.OPEN, 1)));
+        when(ticketRepository.countByPriorityAndStatusNot(TicketPriority.URGENT.getCode(), TicketStatus.CLOSED.getCode()))
+                .thenReturn(1L);
 
         DashboardStatsResponse stats = ticketService.getDashboardStats(admin);
 
@@ -160,8 +161,22 @@ class TicketServiceTest {
     }
 
     @Test
+    void getDashboardStats_requesterOnlyCountsOwnTickets() {
+        when(ticketRepository.countGroupedByStatusForRequester(3L)).thenReturn(List.of(statusCount(TicketStatus.OPEN, 2)));
+        when(ticketRepository.countByRequesterIdAndPriorityAndStatusNot(3L, TicketPriority.URGENT.getCode(), TicketStatus.CLOSED.getCode()))
+                .thenReturn(1L);
+
+        DashboardStatsResponse stats = ticketService.getDashboardStats(requester);
+
+        assertThat(stats.total()).isEqualTo(2);
+        assertThat(stats.open()).isEqualTo(2);
+        assertThat(stats.urgent()).isEqualTo(1);
+        verify(ticketRepository, never()).countGroupedByStatus();
+    }
+
+    @Test
     void getDashboardStats_returnsZerosWhenNoTickets() {
-        when(ticketRepository.findByRequesterIdOrderByCreatedAtDesc(3L)).thenReturn(List.of());
+        when(ticketRepository.countGroupedByStatusForRequester(3L)).thenReturn(List.of());
 
         DashboardStatsResponse stats = ticketService.getDashboardStats(requester);
 
@@ -363,122 +378,6 @@ class TicketServiceTest {
         verify(auditService).record(eq(technician), eq("TICKET_STATUS_UPDATED"), any(), eq(10L), any(), any());
     }
 
-    // --- updateTicketStatus ---
-
-    @Test
-    void updateTicketStatus_updatesStatus() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        Ticket saved = buildTicket(10L, TicketStatus.RESOLVED, TicketPriority.MEDIUM);
-        saved.setRequester(requester);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        TicketResponse result = ticketService.updateTicketStatus(10L, technician, TicketStatus.RESOLVED.getCode());
-
-        assertThat(result.status()).isEqualTo(TicketStatus.RESOLVED.getCode());
-    }
-
-    @Test
-    void updateTicketStatus_throwsForbiddenWhenActorIsRequester() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-
-        assertThatThrownBy(() -> ticketService.updateTicketStatus(10L, requester, TicketStatus.RESOLVED.getCode()))
-                .isInstanceOf(ForbiddenOperationException.class);
-    }
-
-    @Test
-    void updateTicketStatus_recordsAuditWhenStatusChanges() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        Ticket saved = buildTicket(10L, TicketStatus.IN_PROGRESS, TicketPriority.MEDIUM);
-        saved.setRequester(requester);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        ticketService.updateTicketStatus(10L, technician, TicketStatus.IN_PROGRESS.getCode());
-
-        verify(auditService).record(eq(technician), eq("TICKET_STATUS_UPDATED"), any(), eq(10L), any(), any());
-    }
-
-    // --- updateTicketPriority ---
-
-    @Test
-    void updateTicketPriority_updatesPriority() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        Ticket saved = buildTicket(10L, TicketStatus.OPEN, TicketPriority.HIGH);
-        saved.setRequester(requester);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        TicketResponse result = ticketService.updateTicketPriority(10L, technician, TicketPriority.HIGH.getCode());
-
-        assertThat(result.priority()).isEqualTo(TicketPriority.HIGH.getCode());
-    }
-
-    @Test
-    void updateTicketPriority_throwsForbiddenWhenActorIsRequester() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-
-        assertThatThrownBy(() -> ticketService.updateTicketPriority(10L, requester, TicketPriority.HIGH.getCode()))
-                .isInstanceOf(ForbiddenOperationException.class);
-    }
-
-    @Test
-    void updateTicketPriority_recordsAuditWhenPriorityChanges() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        Ticket saved = buildTicket(10L, TicketStatus.OPEN, TicketPriority.URGENT);
-        saved.setRequester(requester);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        ticketService.updateTicketPriority(10L, technician, TicketPriority.URGENT.getCode());
-
-        verify(auditService).record(eq(technician), eq("TICKET_PRIORITY_UPDATED"), any(), eq(10L), any(), any());
-    }
-
-    // --- assignTicket ---
-
-    @Test
-    void assignTicket_assignsTechnicianToOpenTicket() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(technician));
-        Ticket saved = buildTicket(10L, TicketStatus.IN_PROGRESS, TicketPriority.MEDIUM);
-        saved.setRequester(requester);
-        saved.setAssignedTo(technician);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        TicketResponse result = ticketService.assignTicket(10L, admin, 2L);
-
-        assertThat(result.status()).isEqualTo(TicketStatus.IN_PROGRESS.getCode());
-    }
-
-    @Test
-    void assignTicket_throwsBusinessRuleWhenAssignedUserIsNotTechnician() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        when(userRepository.findById(3L)).thenReturn(Optional.of(requester));
-
-        assertThatThrownBy(() -> ticketService.assignTicket(10L, admin, 3L))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("Technician");
-    }
-
-    @Test
-    void assignTicket_throwsForbiddenWhenActorIsRequester() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-
-        assertThatThrownBy(() -> ticketService.assignTicket(10L, requester, 2L))
-                .isInstanceOf(ForbiddenOperationException.class);
-    }
-
-    @Test
-    void assignTicket_recordsAuditWhenAssignmentChanges() {
-        when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(technician));
-        Ticket saved = buildTicket(10L, TicketStatus.IN_PROGRESS, TicketPriority.MEDIUM);
-        saved.setRequester(requester);
-        saved.setAssignedTo(technician);
-        when(ticketRepository.saveAndFlush(any(Ticket.class))).thenReturn(saved);
-
-        ticketService.assignTicket(10L, admin, 2L);
-
-        verify(auditService).record(eq(admin), eq("TICKET_ASSIGNED"), any(), eq(10L), any(), any());
-    }
-
     // --- listComments ---
 
     @Test
@@ -554,18 +453,21 @@ class TicketServiceTest {
         verify(auditService).record(eq(technician), eq("COMMENT_ADDED"), any(), eq(5L), eq(null), any());
     }
 
-    // --- listAssignableTickets ---
-
-    @Test
-    void listAssignableTickets_returnsVisibleTicketsForActor() {
-        when(ticketRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(ticket));
-
-        List<TicketResponse> result = ticketService.listAssignableTickets(technician);
-
-        assertThat(result).hasSize(1);
-    }
-
     // --- helpers ---
+
+    private TicketRepository.StatusCount statusCount(TicketStatus status, long total) {
+        return new TicketRepository.StatusCount() {
+            @Override
+            public Integer getStatus() {
+                return status.getCode();
+            }
+
+            @Override
+            public Long getTotal() {
+                return total;
+            }
+        };
+    }
 
     private Ticket buildTicket(Long id, TicketStatus status, TicketPriority priority) {
         Ticket t = new Ticket();

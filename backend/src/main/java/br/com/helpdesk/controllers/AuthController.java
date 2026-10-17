@@ -6,7 +6,6 @@ import br.com.helpdesk.dtos.LoginResponse;
 import br.com.helpdesk.dtos.UserResponse;
 import br.com.helpdesk.services.AuthService;
 import br.com.helpdesk.security.CurrentUserService;
-import br.com.helpdesk.utils.DtoMapper;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,7 +37,7 @@ public class AuthController {
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public UserResponse me(Authentication authentication) {
-        return DtoMapper.toUserResponse(currentUserService.requireUser(authentication));
+        return authService.describe(currentUserService.requireUser(authentication));
     }
 
     @PostMapping("/logout")

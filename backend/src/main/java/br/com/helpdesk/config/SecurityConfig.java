@@ -1,5 +1,6 @@
 package br.com.helpdesk.config;
 
+import br.com.helpdesk.exceptions.ApiErrorResponse;
 import br.com.helpdesk.security.TokenAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -7,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -23,7 +25,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -58,9 +59,9 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) ->
-                                writeError(response, objectMapper, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", "Authentication required.", request.getRequestURI()))
+                                writeError(response, objectMapper, HttpStatus.UNAUTHORIZED, "Authentication required.", request.getRequestURI()))
                         .accessDeniedHandler((request, response, accessDeniedException) ->
-                                writeError(response, objectMapper, HttpServletResponse.SC_FORBIDDEN, "Forbidden", "You do not have permission to perform this operation.", request.getRequestURI()))
+                                writeError(response, objectMapper, HttpStatus.FORBIDDEN, "You do not have permission to perform this operation.", request.getRequestURI()))
                 )
                 .addFilterBefore(tokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -100,18 +101,12 @@ public class SecurityConfig {
     private void writeError(
             HttpServletResponse response,
             ObjectMapper objectMapper,
-            int status,
-            String error,
+            HttpStatus status,
             String message,
             String path
     ) throws IOException {
-        response.setStatus(status);
+        response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getWriter(), Map.of(
-                "status", status,
-                "error", error,
-                "message", message,
-                "path", path
-        ));
+        objectMapper.writeValue(response.getWriter(), ApiErrorResponse.of(status, message, path));
     }
 }

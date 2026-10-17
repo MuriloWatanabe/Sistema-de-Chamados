@@ -8,6 +8,7 @@ import br.com.helpdesk.dtos.TicketUpdateRequest;
 import br.com.helpdesk.services.TicketService;
 import br.com.helpdesk.security.CurrentUserService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -45,12 +47,14 @@ public class TicketController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
     public TicketResponse createTicket(@Valid @RequestBody TicketCreateRequest request, Authentication authentication) {
         return ticketService.createTicket(currentUserService.requireUser(authentication), request);
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteTicket(@PathVariable Long id, Authentication authentication) {
         ticketService.deleteTicket(id, currentUserService.requireUser(authentication));
@@ -58,7 +62,7 @@ public class TicketController {
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('TECHNICIAN', 'SUPERVISOR', 'ADMIN')")
-    public TicketResponse updateTicket(@PathVariable Long id, @RequestBody TicketUpdateRequest request, Authentication authentication) {
+    public TicketResponse updateTicket(@PathVariable Long id, @Valid @RequestBody TicketUpdateRequest request, Authentication authentication) {
         return ticketService.updateTicket(id, currentUserService.requireUser(authentication), request);
     }
 
@@ -69,6 +73,7 @@ public class TicketController {
     }
 
     @PostMapping("/{id}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
     public CommentResponse addComment(@PathVariable Long id, @Valid @RequestBody CommentCreateRequest request, Authentication authentication) {
         return ticketService.addComment(id, currentUserService.requireUser(authentication), request);
